@@ -1,6 +1,70 @@
-/*
-Vault Warden styles.
+/* Vault Warden */
 
-Nothing here yet. Real styles land alongside the settings UI and any
-in-editor decorations added in later phases.
-*/
+.vault-warden-has-violations {
+  color: var(--text-error);
+}
+
+.vault-warden-view {
+  padding: var(--size-4-2);
+}
+
+.vault-warden-note-name {
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--size-4-2);
+}
+
+.vault-warden-empty,
+.vault-warden-clean {
+  color: var(--text-muted);
+}
+
+.vault-warden-item {
+  padding: var(--size-4-2);
+  margin-bottom: var(--size-4-1);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+
+.vault-warden-item-head {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  flex-wrap: wrap;
+}
+
+.vault-warden-rule {
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-error);
+}
+
+.vault-warden-field {
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
+}
+
+.vault-warden-mechanical {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-success);
+  border: 1px solid var(--text-success);
+  border-radius: var(--radius-s);
+  padding: 0 var(--size-2-2);
+}
+
+.vault-warden-item-body {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  margin-top: var(--size-2-2);
+  overflow-wrap: anywhere;
+}
+
+.vault-warden-suppressed,
+.vault-warden-load-errors {
+  margin-top: var(--size-4-3);
+  color: var(--text-faint);
+  font-size: var(--font-ui-small);
+}
+
+.vault-warden-suppressed .vault-warden-item {
+  opacity: 0.6;
+}

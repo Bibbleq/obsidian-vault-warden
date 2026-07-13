@@ -9,23 +9,32 @@ All of that is data, stored as YAML in a schemas folder you point the plugin
 at. Point the same plugin at a different vault with different manifests and
 it enforces different rules, with no code changes.
 
-## Features (v0.1)
+## Features (v0.2)
 
-- Frontmatter rule validation with stable, machine-checkable rule IDs:
-  - `CLASS-FIELD-MISSING` — a required field for the note's class is absent.
-  - `CLASS-FIELD-TYPE` — a field's value doesn't match its declared type.
-  - `DATE-FORMAT` — a date-like field doesn't match one of the accepted formats.
-  - `TAG-CASE` — a tag doesn't match the configured case style.
-  - `TAG-RETIRED` — a tag has been retired in favour of a replacement (or removal).
-  - `FM-AREA-INVALID` — a frontmatter value isn't present in its backing source list.
-  - `CLASS-UNDECLARED` — a note's folder implies a class it doesn't declare.
-- Two-tier fix classification (`auto` / `confirm` / `none`) declared per rule
-  in the manifest, so the plugin knows which fixes it may apply silently and
-  which need confirmation.
-- `validator_ignore` frontmatter opt-out, so individual notes can suppress
-  specific rule IDs without disabling the rule vault-wide.
-- Hot-reload of manifests: edit a schema file in the vault and validation
-  picks it up immediately, no reload required.
+- Frontmatter rule validation with stable, machine-checkable rule IDs, shared
+  with external batch validators so one manifest set drives every enforcement
+  point:
+  - Base fields — `FM-AREA-MISSING` / `FM-AREA-INVALID`,
+    `FM-NOTETYPE-MISSING` / `FM-NOTETYPE-INVALID`,
+    `FM-ORIGIN-MISSING` / `FM-ORIGIN-INVALID`
+  - Tags — `TAG-FORMAT`, `TAG-CASE`, `TAG-DEPTH`, `TAG-RETIRED`, `TAG-DUPLICATE`
+  - Dates — `DATE-FORMAT` (ISO, incl. suffix-named fields on classless notes),
+    `CREATED-MISSING`
+  - Classes — `CLASS-UNKNOWN`, `CLASS-FIELD-MISSING` (incl. conditional
+    `required_when`), `CLASS-FIELD-TYPE`, `CLASS-FIELD-VALUE`,
+    `CLASS-EXPECTED`, `CLASS-MISFILED`
+- A right-sidebar violations pane (status-bar badge and ribbon icon open it;
+  a command opens it on mobile, where there is no status bar).
+- Violations carry a `mechanical` flag plus a concrete `suggested_fix`
+  operation, the groundwork for the upcoming fix layer.
+- Per-note `validator_ignore` frontmatter and a vault-wide `exceptions` file
+  mark violations suppressed-but-reported (or skip a note entirely).
+- A creation hook stamps `class:` (plus configured extras such as
+  `origin: manual`) on notes created inside folders mapped in
+  `class_locations`.
+- Hot-reload: edit any schema file in the vault and validation picks it up
+  immediately. Schema files may be `.yaml` or `.md` (YAML content) — useful
+  when Obsidian Sync isn't configured to carry non-native file types.
 
 ## Installing via BRAT
 
@@ -55,7 +64,8 @@ match this plugin's rule semantics exactly.
 
 ## Roadmap
 
-- One-click fixes for `auto`-tier rules directly from the validation surface.
+- One-click (and silent, for content-preserving cases) application of
+  `suggested_fix` operations from the violations pane.
 - Filename-to-H1 sync as a third leg alongside frontmatter and class validation.
 - A class-aware field editor pane for editing frontmatter without hand-writing YAML.
 

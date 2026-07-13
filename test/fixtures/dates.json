@@ -1,0 +1,318 @@
+[
+  {
+    "name": "manifest date field with plain iso date is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "publish_date": {
+            "name": "publish_date",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "publish_date": "2026-07-13",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "manifest date field with non-zero-padded date is a violation",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "publish_date": {
+            "name": "publish_date",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "publish_date": "2026-7-13",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "DATE-FORMAT",
+        "field": "publish_date"
+      }
+    ]
+  },
+  {
+    "name": "manifest date field with iso datetime and minutes is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "publish_date": {
+            "name": "publish_date",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "publish_date": "2026-07-13T09:30",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "manifest date field with full offset datetime is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "publish_date": {
+            "name": "publish_date",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "publish_date": "2026-07-13T09:30:15.5+01:00",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "space instead of t is a mechanical violation with a set_field fix",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "publish_date": {
+            "name": "publish_date",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "publish_date": "2026-07-13 09:30",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "DATE-FORMAT",
+        "field": "publish_date",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_field",
+          "field": "publish_date",
+          "value": "2026-07-13T09:30"
+        }
+      }
+    ]
+  },
+  {
+    "name": "suffix-based date check fires on a classless note",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [
+        "_date",
+        "_deadline"
+      ],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "due_date": "13-07-2026",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "DATE-FORMAT",
+        "field": "due_date"
+      }
+    ]
+  },
+  {
+    "name": "presence_only field is never format-checked even with a bad value",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [
+        "created"
+      ],
+      "presence_only": [
+        "created"
+      ]
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "not-a-date"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "a list of dates with one bad item produces one violation for that item",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "occurrences": {
+            "name": "occurrences",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "occurrences": [
+          "2026-07-13",
+          "13/07/2026"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "DATE-FORMAT",
+        "field": "occurrences",
+        "found": "13/07/2026"
+      }
+    ]
+  },
+  {
+    "name": "empty date field is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "publish_date": {
+            "name": "publish_date",
+            "type": "date"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "publish_date": "",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  }
+]

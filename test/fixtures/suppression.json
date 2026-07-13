@@ -1,0 +1,85 @@
+[
+  {
+    "name": "validator_ignore as a list suppresses the matching rule",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": { "validator_ignore": ["CREATED-MISSING"] } },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created", "suppressed": true }]
+  },
+  {
+    "name": "validator_ignore as a bare string suppresses the matching rule",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": { "validator_ignore": "CREATED-MISSING" } },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created", "suppressed": true }]
+  },
+  {
+    "name": "lowercase rule id in validator_ignore still matches",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": { "validator_ignore": "created-missing" } },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created", "suppressed": true }]
+  },
+  {
+    "name": "unaffected rules stay unsuppressed",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": { "name": "area", "type": "select", "required": true, "values": ["IT Pro"] }
+      },
+      "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": { "validator_ignore": ["FM-AREA-MISSING"] } },
+    "expect": [
+      { "rule": "FM-AREA-MISSING", "field": "area", "suppressed": true },
+      { "rule": "CREATED-MISSING", "field": "created", "suppressed": false }
+    ]
+  },
+  {
+    "name": "exception with a path and no rules fully skips the note",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "exceptions": [{ "path": "Notes/Ignored.md" }],
+    "file": { "path": "Notes/Ignored.md", "frontmatter": {} },
+    "expect": []
+  },
+  {
+    "name": "exception with a pattern glob fully skips matching notes",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "exceptions": [{ "pattern": "*.excalidraw.md" }],
+    "file": { "path": "Drawings/Sketch.excalidraw.md", "frontmatter": {} },
+    "expect": []
+  },
+  {
+    "name": "rule-scoped exception suppresses but still reports the violation",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "exceptions": [{ "path": "Notes/Special.md", "rules": ["CREATED-MISSING"] }],
+    "file": { "path": "Notes/Special.md", "frontmatter": {} },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created", "suppressed": true }]
+  },
+  {
+    "name": "exception for a different path has no effect",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "exceptions": [{ "path": "Notes/Other.md", "rules": ["CREATED-MISSING"] }],
+    "file": { "path": "Notes/Mine.md", "frontmatter": {} },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created", "suppressed": false }]
+  }
+]

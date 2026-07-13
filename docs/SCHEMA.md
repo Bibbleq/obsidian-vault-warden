@@ -3,170 +3,157 @@
 Vault Warden is driven entirely by YAML manifests stored **in your vault**. Nothing about
 your vault's classes, folders, tags, or fields is hardcoded in the plugin.
 
-Two kinds of file live in the schemas folder (the folder containing your configured base
-schema file, default `_vault/Metadata Sources/Schemas/`):
+This format is shared with external batch validators (the same files can drive a
+CI/server-side validator); the conformance fixtures in `test/fixtures/` pin the
+semantics both sides must implement.
 
-- **`base.yaml`** — vault-wide configuration: rule settings, folder→class map, title-sync
-  behaviour. Exactly one; its path is a plugin setting.
-- **Class manifests** — one YAML file per note class (e.g. `Recipe.yaml`), declaring that
-  class's frontmatter fields. Every `.yaml`/`.yml` file in the schemas folder other than
-  the base file is treated as a class manifest.
+## Files
 
-All files are parsed with Obsidian's built-in YAML parser and hot-reloaded when anything
-in the schemas folder changes.
+All schema files live in one folder (default `_vault/Metadata Sources/Schemas/`; the
+plugin setting points at the base file inside it). Every file may have either a
+`.yaml` or `.md` extension — Obsidian Sync only carries non-native file types when
+"sync all other types" is enabled, so `.md` files whose entire content is YAML are
+accepted as equivalent transport. `.yaml` wins when both exist.
+
+| stem | purpose |
+|---|---|
+| `base` | vault-wide schema: base fields, tag rules, date rules |
+| `class_locations` | folder-prefix → class map (optional) |
+| `exceptions` | notes deliberately outside the rules (optional) |
+| anything else | one class manifest per file |
 
 ## base.yaml
 
 ```yaml
-version: 1
+base_schema_version: 2
 
-# Folder of "line-list" notes used by select: field types and source-backed rules.
-# A line-list note is a plain .md file with one valid value per line
-# (empty lines and lines starting with '#' are ignored).
-metadata_sources: "_vault/Metadata Sources"
+fields:            # checked on EVERY note
+  area:
+    type: select:Areas        # values from <Metadata Sources>/Areas.md
+    required: true
+  notetype:
+    type: multi:Note Types
+    required: true
+    required_unless: class     # optional once class types the note
+  origin:
+    type: select:Origin
+    required: true
 
-# Frontmatter key that names a note's class.
-class_key: class
+tags:
+  max_depth: 2                 # TAG-DEPTH: max '/'-separated levels
+  retired:                     # TAG-RETIRED: remove on sight (case-insensitive)
+    - OldTag
 
-# Frontmatter key holding a list of rule IDs to skip for that note.
-ignore_key: validator_ignore
+dates:
+  name_suffixes: [_date, _deadline]   # DATE-FORMAT applies to any field with
+                                      # these suffixes, classed or not
+  presence_only: [created]            # never format-checked ('linter_managed'
+                                      # accepted as a legacy key name)
 
-# Optional frontmatter property kept in sync with the H1/filename (third sync leg).
-# Empty string = disabled. (Sync engine ships in a later phase; the key is reserved.)
-frontmatter_title: ""
-
-# Folder path -> class name. Used by CLASS-UNDECLARED and by the creation hook.
-# Paths are vault-relative folder paths without trailing slash; a note matches if it
-# is inside the folder or any subfolder. The deepest (longest) match wins.
-class_locations:
-  "Projects/Recipes": Recipe
-
-# Extra frontmatter keys stamped (alongside class_key) when the creation hook fires.
+# Plugin-only key (batch validators ignore unknown keys): extra frontmatter
+# stamped alongside class: by the creation hook.
 creation_stamp:
   origin: manual
-
-# Rule configuration. A rule runs only if its ID appears here.
-# Every rule takes `fix: auto | confirm | none` — the fix tier
-# (auto = content-preserving, applied silently; confirm = one-click from the pane;
-# none = report only). The tier is carried on each violation; the fix layer itself
-# ships in a later phase.
-rules:
-  CLASS-FIELD-MISSING: { fix: confirm }
-  CLASS-FIELD-TYPE: { fix: none }
-  DATE-FORMAT:
-    fix: auto
-    # Accepted formats for date-typed fields. Tokens: YYYY MM DD HH mm ss.
-    # Everything else in a pattern is a literal character.
-    formats:
-      - "YYYY-MM-DD"
-      - "YYYY-MM-DDTHH:mm"
-      - "YYYY-MM-DDTHH:mm:ss"
-  TAG-CASE:
-    fix: auto
-    # Currently only "pascal": every '/'-separated segment of every tag must be
-    # PascalCase (optional leading digits, then an uppercase letter, then
-    # letters/digits — e.g. Microsoft/Copilot, 3DPrinting/Klipper).
-    style: pascal
-  TAG-RETIRED:
-    fix: confirm
-    # Exact full-tag match -> replacement. Empty/null replacement = remove.
-    map:
-      OldTag: NewTag
-      DeadTag: ""
-  FM-AREA-INVALID:
-    fix: confirm
-    # Vault-wide select check on one base field, independent of class.
-    field: area
-    source: Areas          # -> <metadata_sources>/Areas.md
-  CLASS-UNDECLARED: { fix: auto }
-
-# Filename <-> H1 sync configuration (sync engine ships in a later phase; the block
-# is defined now so manifests are forward-compatible).
-title_sync:
-  strip: ":|#^[]\\/?"      # characters removed when projecting H1 -> filename
-  replacement: ""           # what each stripped char becomes ("" = removed)
-  ignore:                    # path prefixes exempt from sync
-    - "_vault/Templates/"
 ```
+
+Only `area`, `notetype`, and `origin` have base-field rules (`FM-AREA-*`,
+`FM-NOTETYPE-*`, `FM-ORIGIN-*`); other names under `fields:` are ignored.
 
 ## Class manifests
 
-One file per class. The file must contain a top-level `class:` key; the filename is
-conventionally `<ClassName>.yaml` but the `class:` key is authoritative.
-
 ```yaml
-class: Recipe
+manifest_version: 2
+class: Recipe                  # authoritative; filename is convention
 fields:
-  created:
-    type: date
+  created: {type: date, required: true}
+  status:
+    type: select               # inline closed list
     required: true
-  area:
-    type: select:Areas     # value must appear in <metadata_sources>/Areas.md
-    required: true
-  tags:
-    type: list
-  source:
-    type: wikilink          # "[[Note]]" / "[[Note|alias]]" / "[[Note#heading]]"
-  servings:
-    type: text              # any scalar string
-    required: false          # default
+    values: [Draft, Published]
+  source: {type: wikilink}
+  servings: {type: number}
+  link: {type: url}
+  steps: {type: list}
+  superseded_by:
+    type: wikilink
+    required_when: {field: status, equals: Superseded}
+lifecycle:                     # parsed; used by batch staleness rules only
+  - date_field: publish_date
+    when_status: [Draft]
+    suggest: Published
 ```
 
-### Field types
+### Field type grammar
 
-| type | valid value |
-|---|---|
-| `date` | string matching one of the `DATE-FORMAT` patterns |
-| `select:<Source>` | string appearing in the line-list note `<metadata_sources>/<Source>.md` — if the source list cannot be resolved, the membership check is skipped (fail open) |
-| `list` | YAML sequence (array) |
-| `wikilink` | string of the form `[[...]]` (alias/heading/block suffixes allowed) |
-| `text` | scalar string |
+`date`, `datetime`, `list`, `wikilink`, `text`, `number`, `url`,
+`select` / `multi` (inline `values:`), `select:<Source>` / `multi:<Source>`
+(values from the line-list note `<Metadata Sources>/<Source>.md` — one value per
+line, blank lines skipped). A missing source note resolves to an **empty** value
+set, which disables membership checking (fail open).
 
-### Emptiness
-
-A field counts as **missing** when the key is absent, or its value is `null`, an empty
-string, a whitespace-only string, or an empty list. Type checks only run on non-missing
-values.
-
-## Rules
-
-| ID | Scope | Fires when |
-|---|---|---|
-| `CLASS-FIELD-MISSING` | classed notes | a `required: true` field of the note's class is missing |
-| `CLASS-FIELD-TYPE` | classed notes | a present field's value doesn't satisfy its declared type |
-| `DATE-FORMAT` | classed notes | a `date`-typed field holds a string that matches no configured format |
-| `TAG-CASE` | all notes | any frontmatter tag has a segment that fails the configured case style |
-| `TAG-RETIRED` | all notes | any frontmatter tag exactly matches a key in the retired map |
-| `FM-AREA-INVALID` | all notes | the configured field is present but its value is not in the configured source list |
-| `CLASS-UNDECLARED` | all notes | the note lives under a `class_locations` folder but has no class declared |
-
-Precedence notes:
-
-- For a `date`-typed field: a non-string value → `CLASS-FIELD-TYPE`; a string in the
-  wrong format → `DATE-FORMAT`. Never both.
-- If a class field is `select:`-typed **and** is the same field named by
-  `FM-AREA-INVALID`, only `FM-AREA-INVALID` fires for an invalid value (stable-ID
-  contract with external validators). `CLASS-FIELD-TYPE` still fires if the value is
-  not a string at all.
-- A note whose declared class has no manifest produces no class-scoped violations.
-- A `select:` value not in its source list is a `CLASS-FIELD-TYPE` violation (there is
-  no dedicated select rule ID).
-- `CLASS-UNDECLARED` violations report `field` = the configured `class_key` and
-  `expected` = the class mapped for the deepest matching folder.
-- In the `TAG-RETIRED` map, a `null` replacement is equivalent to `""` (remove the
-  tag); violations report `expected: ""` in both cases.
-
-## validator_ignore
-
-A note can opt out of specific rules:
+## class_locations.yaml
 
 ```yaml
----
-class: Recipe
-validator_ignore:
-  - DATE-FORMAT
----
+locations:
+  - prefix: "Projects/Recipes/"    # plain string prefix, longest match wins
+    class: Recipe
 ```
 
-The key name is the base schema's `ignore_key`. A bare string is accepted as a
-single-entry list.
+## exceptions.yaml
+
+```yaml
+exceptions:
+  - path: Agents.md                 # exact path — or pattern: "*.excalidraw.md"
+    reason: pointer file, no frontmatter by design
+  - path: Projects/Recipes/Hub.md
+    rules: [CLASS-EXPECTED]         # omit rules = FULL skip (no violations at all)
+    reason: hub note inside a mapped folder
+```
+
+Exactly one of `path` / `pattern` per entry. With `rules:`, matching notes get those
+violations **suppressed-but-reported**; without it the note is fully skipped.
+
+## Rules (write-time subset)
+
+| ID | Fires when |
+|---|---|
+| `FM-AREA-MISSING` † | base field `area` empty (mechanical when the folder path derives a valid area — longest segment-prefix match) |
+| `FM-AREA-INVALID` | `area` present but not in its value set |
+| `FM-NOTETYPE-MISSING` | `notetype` empty and `required_unless` field also empty |
+| `FM-NOTETYPE-INVALID` | any `notetype` entry not in its value set |
+| `FM-ORIGIN-MISSING` / `-INVALID` | same pattern for `origin` |
+| `TAG-FORMAT` † | tag fails `^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$` (or a non-string tag entry) |
+| `TAG-CASE` † | tag is well-formed but a segment starts lowercase |
+| `TAG-DEPTH` | tag deeper than `max_depth` levels |
+| `TAG-RETIRED` † | tag in the retired list (case-insensitive, `#` stripped) |
+| `TAG-DUPLICATE` † | exact duplicate entries in the tags list (one violation per note) |
+| `DATE-FORMAT` † | a date-typed manifest field or `name_suffixes` field isn't ISO (`YYYY-MM-DD` optionally `T HH:mm[:ss[.f]][Z|±hh:mm]`); mechanical for the space-instead-of-T shape |
+| `CREATED-MISSING` | `created` is empty |
+| `CLASS-UNKNOWN` | declared class has no manifest |
+| `CLASS-FIELD-MISSING` | required (or `required_when`-triggered) class field is empty |
+| `CLASS-FIELD-TYPE` | value has the wrong shape for its declared type |
+| `CLASS-FIELD-VALUE` | select/multi value not in the closed value set |
+| `CLASS-EXPECTED` † | no class, under a mapped prefix (mechanical: set the mapped class) |
+| `CLASS-MISFILED` | classed note living outside every prefix mapped to its class |
+
+† = can be mechanical (violation carries a concrete `suggested_fix`).
+
+Batch-only rules (`FILENAME-COLLISION`, `LINK-BROKEN`, `STATUS-STALE`, `INBOX-STALE`,
+`AREA-FOLDER-MISMATCH`, `BODY-TAG`, `TAG-SPARSE`, `TAG-TWIN`, `FM-PARSE`, …) are
+deliberately not implemented in the plugin — they need whole-vault context, a clock,
+or human judgement.
+
+### Semantics shared by all rules
+
+- **Emptiness**: absent, `null`, empty/whitespace string, empty list, empty mapping.
+- **Class resolution**: `class` may be a list; the first entry (stringified) names the
+  class. An empty class = unclassed.
+- **Tags**: a bare string tags value counts as a one-entry list; a single leading `#`
+  is stripped before checking.
+- **Suppression**: rule IDs listed in the note's `validator_ignore` frontmatter
+  (string or list, matched case-insensitively) or in a matching rule-scoped
+  exception mark those violations `suppressed: true` — reported, not dropped.
+- Suggested tag-casing fixes Pascal-case each segment (splitting on `-`/`_`/space);
+  an engine with vault-wide casing knowledge may substitute established casings
+  (e.g. `LLM` over `Llm`), so fixtures don't assert casing suggestions beyond the
+  Pascal fallback.

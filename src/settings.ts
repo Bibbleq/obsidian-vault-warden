@@ -12,6 +12,8 @@ import {
   STARTER_BASE_YAML,
   STARTER_CLASS_FILENAME,
   STARTER_CLASS_YAML,
+  STARTER_LOCATIONS_FILENAME,
+  STARTER_LOCATIONS_YAML,
 } from "./starter";
 
 export interface VaultWardenSettings {
@@ -22,8 +24,8 @@ export const DEFAULT_SETTINGS: VaultWardenSettings = {
   schemaPath: "_vault/Metadata Sources/Schemas/base.yaml",
 };
 
-/** Suggests YAML files from the vault while typing in the schema-path field. */
-class YamlFileSuggest extends AbstractInputSuggest<TFile> {
+/** Suggests schema-capable files (.yaml/.yml/.md) while typing the schema path. */
+class SchemaFileSuggest extends AbstractInputSuggest<TFile> {
   private onPick: (file: TFile) => void;
 
   constructor(app: App, input: HTMLInputElement, onPick: (file: TFile) => void) {
@@ -37,7 +39,7 @@ class YamlFileSuggest extends AbstractInputSuggest<TFile> {
       .getFiles()
       .filter(
         (f) =>
-          (f.extension === "yaml" || f.extension === "yml") &&
+          (f.extension === "yaml" || f.extension === "yml" || f.extension === "md") &&
           f.path.toLowerCase().includes(q)
       )
       .slice(0, 20);
@@ -68,7 +70,9 @@ export class VaultWardenSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Base schema file")
       .setDesc(
-        "Vault-relative path to base.yaml. Class manifests are every other YAML file in the same folder."
+        "Vault-relative path to the base schema. Class manifests, class_locations, " +
+          "and exceptions are the other YAML (or YAML-as-.md) files in the same folder; " +
+          "select-source notes live in the folder above it."
       )
       .addText((text) => {
         text
@@ -80,7 +84,7 @@ export class VaultWardenSettingTab extends PluginSettingTab {
             await this.plugin.reloadSchemas();
             this.updateStatus();
           });
-        new YamlFileSuggest(this.app, text.inputEl, async (file) => {
+        new SchemaFileSuggest(this.app, text.inputEl, async (file) => {
           text.setValue(file.path);
           this.plugin.settings.schemaPath = file.path;
           await this.plugin.saveSettings();
@@ -102,14 +106,13 @@ export class VaultWardenSettingTab extends PluginSettingTab {
 
     const loader = this.plugin.loader;
     if (!loader.baseFileExists()) {
-      const warn = el.createEl("p");
-      warn.setText(
-        `No schema found at "${loader.basePath}". Vault Warden is idle until a base schema exists.`
-      );
+      el.createEl("p", {
+        text: `No schema found at "${this.plugin.settings.schemaPath}". Vault Warden is idle until a base schema exists.`,
+      });
       new Setting(el)
         .setName("Create starter schema")
         .setDesc(
-          "Scaffolds a commented base.yaml plus an example class manifest at the configured path."
+          "Scaffolds a commented base schema, an example class manifest, and an empty class_locations file at the configured path."
         )
         .addButton((btn) =>
           btn
@@ -123,11 +126,13 @@ export class VaultWardenSettingTab extends PluginSettingTab {
       return;
     }
 
-    const info = el.createEl("p");
-    const classCount = Object.keys(loader.classes).length;
-    info.setText(
-      `Schema loaded: ${classCount} class manifest${classCount === 1 ? "" : "s"}.`
-    );
+    const classCount = Object.keys(loader.manifests).length;
+    const parts = [
+      `${classCount} class manifest${classCount === 1 ? "" : "s"}`,
+      `${loader.classLocations.length} mapped folder${loader.classLocations.length === 1 ? "" : "s"}`,
+      `${loader.exceptions.length} exception${loader.exceptions.length === 1 ? "" : "s"}`,
+    ];
+    el.createEl("p", { text: `Schema loaded: ${parts.join(", ")}.` });
     if (loader.loadErrors.length > 0) {
       const list = el.createEl("ul");
       for (const err of loader.loadErrors) {
@@ -138,8 +143,8 @@ export class VaultWardenSettingTab extends PluginSettingTab {
 
   private async scaffoldStarter(): Promise<void> {
     const basePath = normalizePath(this.plugin.settings.schemaPath);
-    if (!basePath.endsWith(".yaml") && !basePath.endsWith(".yml")) {
-      new Notice("Schema path must point at a .yaml file.");
+    if (!/\.(yaml|yml|md)$/.test(basePath)) {
+      new Notice("Schema path must point at a .yaml (or .md) file.");
       return;
     }
 
@@ -162,14 +167,20 @@ export class VaultWardenSettingTab extends PluginSettingTab {
       }
     }
 
+    const folder = segments.join("/");
+    const inFolder = (name: string) => (folder === "" ? name : `${folder}/${name}`);
+
     if (!this.app.vault.getFileByPath(basePath)) {
       await this.app.vault.create(basePath, STARTER_BASE_YAML);
     }
-    const folder = segments.join("/");
-    const examplePath =
-      folder === "" ? STARTER_CLASS_FILENAME : `${folder}/${STARTER_CLASS_FILENAME}`;
-    if (!this.app.vault.getAbstractFileByPath(examplePath)) {
-      await this.app.vault.create(examplePath, STARTER_CLASS_YAML);
+    if (!this.app.vault.getAbstractFileByPath(inFolder(STARTER_CLASS_FILENAME))) {
+      await this.app.vault.create(inFolder(STARTER_CLASS_FILENAME), STARTER_CLASS_YAML);
+    }
+    if (!this.app.vault.getAbstractFileByPath(inFolder(STARTER_LOCATIONS_FILENAME))) {
+      await this.app.vault.create(
+        inFolder(STARTER_LOCATIONS_FILENAME),
+        STARTER_LOCATIONS_YAML
+      );
     }
 
     await this.plugin.reloadSchemas();

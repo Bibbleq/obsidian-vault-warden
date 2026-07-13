@@ -1,63 +1,176 @@
 [
   {
-    "name": "frontmatter null with no rules configured produces no violations",
-    "config": {},
+    "name": "frontmatter null with empty base config produces only created-missing",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
     "file": {
-      "path": "Notes/Note.md",
+      "path": "Notes/Empty.md",
       "frontmatter": null
     },
-    "expect": []
+    "expect": [
+      {
+        "rule": "CREATED-MISSING",
+        "field": "created"
+      }
+    ]
   },
   {
-    "name": "empty config produces no violations regardless of frontmatter contents",
-    "config": {},
+    "name": "empty-string tag entry is skipped",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
     "file": {
-      "path": "Notes/Note.md",
-      "frontmatter": { "class": "Nonexistent", "whatever": 123 }
-    },
-    "expect": []
-  },
-  {
-    "name": "a note with many simultaneous violations reports all of them",
-    "config": {
-      "rules": {
-        "CLASS-FIELD-MISSING": { "fix": "confirm" },
-        "CLASS-FIELD-TYPE": { "fix": "none" },
-        "DATE-FORMAT": { "fix": "auto", "formats": ["YYYY-MM-DD"] },
-        "TAG-CASE": { "fix": "auto", "style": "pascal" },
-        "TAG-RETIRED": { "fix": "confirm", "map": { "OldTag": "NewTag" } },
-        "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" },
-        "CLASS-UNDECLARED": { "fix": "auto" }
-      }
-    },
-    "classes": {
-      "Widget": {
-        "class": "Widget",
-        "fields": {
-          "title": { "type": "text", "required": true },
-          "count": { "type": "text" },
-          "created": { "type": "date" }
-        }
-      }
-    },
-    "sources": { "Areas": ["Home", "Work"] },
-    "file": {
-      "path": "Widgets/Sprocket.md",
+      "path": "Note.md",
       "frontmatter": {
-        "class": "Widget",
-        "count": 42,
-        "created": "13/07/2026",
-        "area": "Mars",
-        "tags": ["microsoft", "OldTag"]
+        "tags": [
+          "",
+          "GoodTag"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "whitespace-only field value counts as empty not invalid",
+    "base": {
+      "version": 2,
+      "fields": {
+        "origin": {
+          "name": "origin",
+          "type": "select",
+          "required": true,
+          "values": [
+            "manual"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "origin": "   ",
+        "created": "2026-07-13"
       }
     },
     "expect": [
-      { "rule": "CLASS-FIELD-MISSING", "field": "title" },
-      { "rule": "CLASS-FIELD-TYPE", "field": "count" },
-      { "rule": "DATE-FORMAT", "field": "created" },
-      { "rule": "TAG-CASE", "field": "microsoft" },
-      { "rule": "TAG-RETIRED", "field": "OldTag", "expected": "NewTag" },
-      { "rule": "FM-AREA-INVALID", "field": "area" }
+      {
+        "rule": "FM-ORIGIN-MISSING",
+        "field": "origin"
+      }
+    ]
+  },
+  {
+    "name": "an everything-wrong note fires several violations at once",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro"
+          ]
+        },
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Note"
+          ]
+        },
+        "origin": {
+          "name": "origin",
+          "type": "select",
+          "required": true,
+          "values": [
+            "manual"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [
+        "_date"
+      ],
+      "presence_only": []
+    },
+    "manifests": {},
+    "file": {
+      "path": "Everything.md",
+      "frontmatter": {
+        "area": "",
+        "notetype": "Bogus",
+        "origin": "nope",
+        "tags": [
+          "Bad_Tag",
+          "microsoft"
+        ],
+        "review_date": "13-07-2026",
+        "class": "Ghost"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-AREA-MISSING",
+        "field": "area"
+      },
+      {
+        "rule": "FM-NOTETYPE-INVALID",
+        "field": "notetype",
+        "found": "Bogus"
+      },
+      {
+        "rule": "FM-ORIGIN-INVALID",
+        "field": "origin",
+        "found": "nope"
+      },
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags"
+      },
+      {
+        "rule": "TAG-CASE",
+        "field": "tags"
+      },
+      {
+        "rule": "DATE-FORMAT",
+        "field": "review_date"
+      },
+      {
+        "rule": "CREATED-MISSING",
+        "field": "created"
+      },
+      {
+        "rule": "CLASS-UNKNOWN",
+        "field": "class",
+        "found": "Ghost"
+      }
     ]
   }
 ]

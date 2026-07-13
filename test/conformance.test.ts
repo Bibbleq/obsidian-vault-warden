@@ -12,16 +12,19 @@ import { compareViolations, type Loose } from "./helpers/compare";
  * `expect` array per the comparison semantics in docs/FIXTURES.md (order-insensitive,
  * subset-match per violation, exact count).
  *
- * Fixtures are plain JSON and deliberately minimal: a case may omit `config`,
- * `classes`, or `sources` entirely when it doesn't need them. Those default to
- * `{}` here, matching ValidationInput's shape.
+ * Fixtures are plain JSON and deliberately minimal: a case may omit `manifests`,
+ * `class_locations`, or `exceptions` entirely when it doesn't need them. Those
+ * default to `{}` / `[]` / `[]` here, matching ValidationInput's shape. `base` is
+ * always required — every fixture case supplies at least the neutral baseline
+ * block described in docs/FIXTURES.md.
  */
 
 interface FixtureCase {
   name: string;
-  config?: ValidationInput["config"];
-  classes?: ValidationInput["classes"];
-  sources?: ValidationInput["sources"];
+  base: ValidationInput["base"];
+  manifests?: ValidationInput["manifests"];
+  class_locations?: ValidationInput["class_locations"];
+  exceptions?: ValidationInput["exceptions"];
   file: ValidationInput["file"];
   expect: Loose[];
 }
@@ -57,9 +60,10 @@ for (const fixtureFile of fixtureFiles) {
     for (const testCase of cases) {
       it(testCase.name, () => {
         const input: ValidationInput = {
-          config: testCase.config ?? {},
-          classes: testCase.classes ?? {},
-          sources: testCase.sources ?? {},
+          base: testCase.base,
+          manifests: testCase.manifests ?? {},
+          class_locations: testCase.class_locations ?? [],
+          exceptions: testCase.exceptions ?? [],
           file: testCase.file,
         };
 

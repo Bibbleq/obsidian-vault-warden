@@ -1,0 +1,609 @@
+[
+  {
+    "name": "area empty produces fm-area-missing",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "area": "",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-AREA-MISSING",
+        "field": "area"
+      }
+    ]
+  },
+  {
+    "name": "notetype empty with no class produces fm-notetype-missing",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Note"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-NOTETYPE-MISSING",
+        "field": "notetype"
+      }
+    ]
+  },
+  {
+    "name": "origin empty produces fm-origin-missing",
+    "base": {
+      "version": 2,
+      "fields": {
+        "origin": {
+          "name": "origin",
+          "type": "select",
+          "required": true,
+          "values": [
+            "manual"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-ORIGIN-MISSING",
+        "field": "origin"
+      }
+    ]
+  },
+  {
+    "name": "area value not in values produces fm-area-invalid",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "area": "Nonsense",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-AREA-INVALID",
+        "field": "area",
+        "found": "Nonsense"
+      }
+    ]
+  },
+  {
+    "name": "notetype value not in values produces fm-notetype-invalid",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Note"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "notetype": "Bogus",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-NOTETYPE-INVALID",
+        "field": "notetype",
+        "found": "Bogus"
+      }
+    ]
+  },
+  {
+    "name": "origin value not in values produces fm-origin-invalid",
+    "base": {
+      "version": 2,
+      "fields": {
+        "origin": {
+          "name": "origin",
+          "type": "select",
+          "required": true,
+          "values": [
+            "manual"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "origin": "nope",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-ORIGIN-INVALID",
+        "field": "origin",
+        "found": "nope"
+      }
+    ]
+  },
+  {
+    "name": "area value in values is clean",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "area": "IT Pro",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "notetype value in values is clean",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Note"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "notetype": "Note",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "origin value in values is clean",
+    "base": {
+      "version": 2,
+      "fields": {
+        "origin": {
+          "name": "origin",
+          "type": "select",
+          "required": true,
+          "values": [
+            "manual"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "origin": "manual",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "empty values list means invalid never fires",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": []
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "area": "Whatever",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "notetype empty but class present is clean via required_unless",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "required_unless": "class",
+          "values": [
+            "Note"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": { "name": "Recipe", "version": 1, "fields": {} }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "notetype empty and no class fires fm-notetype-missing",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "required_unless": "class",
+          "values": [
+            "Note"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-NOTETYPE-MISSING",
+        "field": "notetype"
+      }
+    ]
+  },
+  {
+    "name": "multi-type notetype with two bad entries produces one violation per bad entry",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Good"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "notetype": [
+          "Good",
+          "Bad1",
+          "Bad2"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-NOTETYPE-INVALID",
+        "field": "notetype",
+        "found": "Bad1"
+      },
+      {
+        "rule": "FM-NOTETYPE-INVALID",
+        "field": "notetype",
+        "found": "Bad2"
+      }
+    ]
+  },
+  {
+    "name": "area missing is mechanical when the folder derives the longer area",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro",
+            "IT Pro/Speaking"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "IT Pro/Speaking/x.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-AREA-MISSING",
+        "field": "area",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_field",
+          "field": "area",
+          "value": "IT Pro/Speaking"
+        }
+      }
+    ]
+  },
+  {
+    "name": "area missing on a root-level note is not mechanical",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro",
+            "IT Pro/Speaking"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-AREA-MISSING",
+        "field": "area",
+        "mechanical": false
+      }
+    ]
+  },
+  {
+    "name": "base fields fire on notes with no class context at all",
+    "base": {
+      "version": 2,
+      "fields": {
+        "area": {
+          "name": "area",
+          "type": "select",
+          "required": true,
+          "values": [
+            "IT Pro"
+          ]
+        },
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Note"
+          ]
+        },
+        "origin": {
+          "name": "origin",
+          "type": "select",
+          "required": true,
+          "values": [
+            "manual"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "FM-AREA-MISSING",
+        "field": "area"
+      },
+      {
+        "rule": "FM-NOTETYPE-MISSING",
+        "field": "notetype"
+      },
+      {
+        "rule": "FM-ORIGIN-MISSING",
+        "field": "origin"
+      }
+    ]
+  },
+  {
+    "name": "a base field name other than area notetype or origin is ignored",
+    "base": {
+      "version": 2,
+      "fields": {
+        "status": {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "values": [
+            "Draft"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  }
+]

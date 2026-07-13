@@ -1,10 +1,10 @@
 {
-  "id": "vault-warden",
-  "name": "Vault Warden",
-  "version": "0.1.0",
-  "minAppVersion": "1.5.0",
-  "description": "Schema-driven, write-time vault hygiene. Validates the active note's frontmatter against YAML rule manifests stored in your vault.",
-  "author": "Ben Lee",
-  "authorUrl": "https://bibble-it.com",
-  "isDesktopOnly": false
+	"id": "vault-warden",
+	"name": "Vault Warden",
+	"version": "0.2.0",
+	"minAppVersion": "1.5.0",
+	"description": "Schema-driven, write-time vault hygiene. Validates the active note's frontmatter against YAML rule manifests stored in your vault.",
+	"author": "Ben Lee",
+	"authorUrl": "https://bibble-it.com",
+	"isDesktopOnly": false
 }

@@ -1,0 +1,877 @@
+[
+  {
+    "name": "unknown class fires class-unknown mentioning none loaded",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {},
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Ghost",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-UNKNOWN",
+        "field": "class",
+        "found": "Ghost",
+        "expected": "a class with a manifest (none loaded)"
+      }
+    ]
+  },
+  {
+    "name": "required class field missing fires class-field-missing",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "title": {
+            "name": "title",
+            "type": "text",
+            "required": true
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-MISSING",
+        "field": "title"
+      }
+    ]
+  },
+  {
+    "name": "required_when field present when condition met is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "status": {
+            "name": "status",
+            "type": "text"
+          },
+          "superseded_by": {
+            "name": "superseded_by",
+            "type": "wikilink",
+            "required_when": {
+              "field": "status",
+              "equals": "Superseded"
+            }
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "status": "Superseded",
+        "superseded_by": "[[Other]]",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "required_when field absent when condition met fires class-field-missing",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "status": {
+            "name": "status",
+            "type": "text"
+          },
+          "superseded_by": {
+            "name": "superseded_by",
+            "type": "wikilink",
+            "required_when": {
+              "field": "status",
+              "equals": "Superseded"
+            }
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "status": "Superseded",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-MISSING",
+        "field": "superseded_by"
+      }
+    ]
+  },
+  {
+    "name": "required_when field absent when condition not met is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "status": {
+            "name": "status",
+            "type": "text"
+          },
+          "superseded_by": {
+            "name": "superseded_by",
+            "type": "wikilink",
+            "required_when": {
+              "field": "status",
+              "equals": "Superseded"
+            }
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "status": "Draft",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "number field with a string value fires class-field-type",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "servings": {
+            "name": "servings",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "servings": "four",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "servings",
+        "found": "four"
+      }
+    ]
+  },
+  {
+    "name": "number field with boolean true fires class-field-type",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "servings": {
+            "name": "servings",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "servings": true,
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "servings"
+      }
+    ]
+  },
+  {
+    "name": "number field with a plain number is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "servings": {
+            "name": "servings",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "servings": 5,
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "number field with a list of numbers is clean per-item",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "servings": {
+            "name": "servings",
+            "type": "number"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "servings": [
+          1,
+          2
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "url field with an https value is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "link": {
+            "name": "link",
+            "type": "url"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "link": "https://x",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "url field with a non-http scheme fires class-field-type",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "link": {
+            "name": "link",
+            "type": "url"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "link": "ftp://x",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "link",
+        "found": "ftp://x"
+      }
+    ]
+  },
+  {
+    "name": "wikilink field with a plain link is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "source": {
+            "name": "source",
+            "type": "wikilink"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "source": "[[Note]]",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "wikilink field with an alias is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "source": {
+            "name": "source",
+            "type": "wikilink"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "source": "[[N|a]]",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "wikilink field with a bare string fires class-field-type",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "source": {
+            "name": "source",
+            "type": "wikilink"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "source": "Note",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "source",
+        "found": "Note"
+      }
+    ]
+  },
+  {
+    "name": "list of wikilinks with one bad entry produces one violation",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "source": {
+            "name": "source",
+            "type": "wikilink"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "source": [
+          "[[A]]",
+          "BadTarget"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "source",
+        "found": "BadTarget"
+      }
+    ]
+  },
+  {
+    "name": "list field with a nested list item fires class-field-type",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "steps": {
+            "name": "steps",
+            "type": "list"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "steps": [
+          [
+            "a",
+            "b"
+          ],
+          "c"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "steps"
+      }
+    ]
+  },
+  {
+    "name": "select field with an array value fires class-field-type single value not a list",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "status": {
+            "name": "status",
+            "type": "select",
+            "values": [
+              "Draft",
+              "Published"
+            ]
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "status": [
+          "Draft",
+          "Published"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "status",
+        "expected": "a single value, not a list"
+      }
+    ]
+  },
+  {
+    "name": "select value outside values fires class-field-value",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "status": {
+            "name": "status",
+            "type": "select",
+            "values": [
+              "Draft",
+              "Published"
+            ]
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "status": "Archived",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-VALUE",
+        "field": "status",
+        "found": "Archived"
+      }
+    ]
+  },
+  {
+    "name": "select field with no values is open and clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "category": {
+            "name": "category",
+            "type": "select"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "category": "AnythingGoes",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "multi field with a bad entry fires class-field-value",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "platforms": {
+            "name": "platforms",
+            "type": "multi",
+            "values": [
+              "Web",
+              "Mobile"
+            ]
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "platforms": [
+          "Web",
+          "Desktop"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-VALUE",
+        "field": "platforms",
+        "found": "Desktop"
+      }
+    ]
+  },
+  {
+    "name": "text field with an object value fires class-field-type",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Doc": {
+        "name": "Doc",
+        "version": 1,
+        "fields": {
+          "notes": {
+            "name": "notes",
+            "type": "text"
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Doc",
+        "notes": {
+          "nested": "obj"
+        },
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-TYPE",
+        "field": "notes"
+      }
+    ]
+  },
+  {
+    "name": "class as a list resolves to the first entry",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "manifests": {
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {
+          "title": {
+            "name": "title",
+            "type": "text",
+            "required": true
+          }
+        }
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": [
+          "Recipe",
+          "SomethingElse"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-FIELD-MISSING",
+        "field": "title"
+      }
+    ]
+  }
+]

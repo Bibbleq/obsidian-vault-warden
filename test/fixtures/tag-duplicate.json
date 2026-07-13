@@ -1,0 +1,96 @@
+[
+  {
+    "name": "exact duplicate tags fire one tag-duplicate with a deduped set_list fix",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "Alpha",
+          "Beta",
+          "Alpha"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-DUPLICATE",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_list",
+          "field": "tags",
+          "value": [
+            "Alpha",
+            "Beta"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "case-different entries are not duplicates",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "Alpha",
+          "alpha"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-CASE",
+        "field": "tags",
+        "found": "alpha"
+      }
+    ]
+  },
+  {
+    "name": "no duplicates is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "Alpha",
+          "Beta",
+          "Gamma"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  }
+]

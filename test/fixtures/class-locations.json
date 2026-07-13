@@ -1,0 +1,250 @@
+[
+  {
+    "name": "no class under a mapped prefix fires class-expected with a mechanical fix",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Recipes/",
+        "class": "Recipe"
+      }
+    ],
+    "file": {
+      "path": "Recipes/Flapjack.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-EXPECTED",
+        "field": "class",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_field",
+          "field": "class",
+          "value": "Recipe"
+        }
+      }
+    ]
+  },
+  {
+    "name": "longest matching prefix wins for the suggested class",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Projects/",
+        "class": "Generic"
+      },
+      {
+        "prefix": "Projects/Recipes/",
+        "class": "Recipe"
+      }
+    ],
+    "file": {
+      "path": "Projects/Recipes/Flapjack.md",
+      "frontmatter": {
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-EXPECTED",
+        "field": "class",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_field",
+          "field": "class",
+          "value": "Recipe"
+        }
+      }
+    ]
+  },
+  {
+    "name": "any class present under a mapped prefix suppresses class-expected",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Recipes/",
+        "class": "Recipe"
+      }
+    ],
+    "manifests": {
+      "Other": { "name": "Other", "version": 1, "fields": {} }
+    },
+    "file": {
+      "path": "Recipes/Flapjack.md",
+      "frontmatter": {
+        "class": "Other",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "class mapped elsewhere and living outside its prefixes fires class-misfiled",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Recipes/",
+        "class": "Recipe"
+      },
+      {
+        "prefix": "Journals/",
+        "class": "Journal"
+      }
+    ],
+    "manifests": {
+      "Journal": { "name": "Journal", "version": 1, "fields": {} }
+    },
+    "file": {
+      "path": "Recipes/Note.md",
+      "frontmatter": {
+        "class": "Journal",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "CLASS-MISFILED",
+        "field": "class",
+        "found": "Journal",
+        "expected": "under one of: Journals/"
+      }
+    ]
+  },
+  {
+    "name": "class not in the map at all is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Recipes/",
+        "class": "Recipe"
+      }
+    ],
+    "manifests": {
+      "Widget": { "name": "Widget", "version": 1, "fields": {} }
+    },
+    "file": {
+      "path": "Misc/Thing.md",
+      "frontmatter": {
+        "class": "Widget",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "classed note inside one of its own prefixes is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Recipes/",
+        "class": "Recipe"
+      }
+    ],
+    "manifests": {
+      "Recipe": { "name": "Recipe", "version": 1, "fields": {} }
+    },
+    "file": {
+      "path": "Recipes/Flapjack.md",
+      "frontmatter": {
+        "class": "Recipe",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "frontmatter null under a mapped prefix fires class-expected and created-missing",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "class_locations": [
+      {
+        "prefix": "Recipes/",
+        "class": "Recipe"
+      }
+    ],
+    "file": {
+      "path": "Recipes/Flapjack.md",
+      "frontmatter": null
+    },
+    "expect": [
+      {
+        "rule": "CLASS-EXPECTED",
+        "field": "class",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_field",
+          "field": "class",
+          "value": "Recipe"
+        }
+      },
+      {
+        "rule": "CREATED-MISSING",
+        "field": "created"
+      }
+    ]
+  }
+]

@@ -1,181 +1,362 @@
 import { App, TFile, TFolder, parseYaml } from "obsidian";
-import type { BaseSchema, ClassManifest } from "./engine/types";
+import type {
+  BaseSchema,
+  ClassLocation,
+  ExceptionRule,
+  FieldSpec,
+  FieldType,
+  LifecycleRule,
+  Manifest,
+} from "./engine/types";
+
+const BASE_TYPES: FieldType[] = [
+  "date",
+  "datetime",
+  "select",
+  "multi",
+  "list",
+  "wikilink",
+  "text",
+  "number",
+  "url",
+];
+
+/** Stems in the schemas folder that are not class manifests. */
+const NON_MANIFEST_STEMS = ["base", "exceptions", "class_locations"];
+
+/** Schema files may travel as .yaml or .md (Obsidian Sync transport); .yaml wins. */
+const SCHEMA_EXTENSIONS = ["yaml", "yml", "md"];
 
 /**
- * Loads and caches the base schema, class manifests, and select-source line lists
- * from the vault. Pure state holder — event wiring (hot reload triggers) lives in
- * main.ts, which calls reload()/invalidateSource() as vault events arrive.
+ * Loads the schema set from the vault, mirroring the reference validator's
+ * loader semantics: base + class manifests + class_locations + exceptions in
+ * one folder, `select:<Source>` / `multi:<Source>` values resolved at load
+ * time from line-list notes in the folder ABOVE the schemas folder.
  */
 export class SchemaLoader {
   private app: App;
   private getSchemaPath: () => string;
 
   base: BaseSchema | null = null;
-  classes: Record<string, ClassManifest> = {};
-  /** Human-readable problems from the last load (bad YAML, missing class key…). */
+  manifests: Record<string, Manifest> = {};
+  classLocations: ClassLocation[] = [];
+  exceptions: ExceptionRule[] = [];
+  /** Extra keys the creation hook stamps alongside class (plugin-only config). */
+  creationStamp: Record<string, string> = {};
+  /** Human-readable problems from the last load. */
   loadErrors: string[] = [];
-
-  private sourceCache = new Map<string, string[]>();
 
   constructor(app: App, getSchemaPath: () => string) {
     this.app = app;
     this.getSchemaPath = getSchemaPath;
   }
 
-  /** Vault-relative path of the configured base schema file. */
-  get basePath(): string {
-    return this.getSchemaPath();
-  }
-
-  /** Folder containing the base schema (class manifests live alongside). */
+  /** Folder containing the base schema file. */
   get schemasFolder(): string {
-    const path = this.basePath;
+    const path = this.getSchemaPath();
     const idx = path.lastIndexOf("/");
     return idx === -1 ? "" : path.slice(0, idx);
   }
 
-  /** Folder the base schema points select: sources at. */
+  /** Folder holding the line-list source notes (parent of the schemas folder). */
   get sourcesFolder(): string {
-    return this.base?.metadata_sources ?? "";
-  }
-
-  /** True when the configured base schema file exists in the vault. */
-  baseFileExists(): boolean {
-    return this.app.vault.getFileByPath(this.basePath) !== null;
-  }
-
-  /** True if a vault path change should trigger a schema reload. */
-  isSchemaPath(path: string): boolean {
     const folder = this.schemasFolder;
+    const idx = folder.lastIndexOf("/");
+    return idx === -1 ? "" : folder.slice(0, idx);
+  }
+
+  baseFileExists(): boolean {
+    return this.findSchemaFile(this.baseStem()) !== null;
+  }
+
+  /** The configured base file's stem (usually "base"). */
+  private baseStem(): string {
+    const path = this.getSchemaPath();
+    const name = path.slice(path.lastIndexOf("/") + 1);
+    const dot = name.lastIndexOf(".");
+    return dot === -1 ? name : name.slice(0, dot);
+  }
+
+  /** True if a changed vault path should trigger a schema reload. */
+  isSchemaPath(path: string): boolean {
+    const schemas = this.schemasFolder;
+    if (schemas !== "" && path.startsWith(schemas + "/")) {
+      return SCHEMA_EXTENSIONS.some((ext) => path.endsWith("." + ext));
+    }
+    // Source line-list notes feed resolved values, so they reload too.
+    const sources = this.sourcesFolder;
     return (
-      path === this.basePath ||
-      (folder !== "" &&
-        path.startsWith(folder + "/") &&
-        (path.endsWith(".yaml") || path.endsWith(".yml")))
+      sources !== "" &&
+      path.startsWith(sources + "/") &&
+      path.endsWith(".md") &&
+      !(schemas !== "" && path.startsWith(schemas + "/"))
     );
   }
 
-  /** True if a vault path change should invalidate the source-list cache. */
-  isSourcePath(path: string): boolean {
-    const folder = this.sourcesFolder;
-    return folder !== "" && path.startsWith(folder + "/") && path.endsWith(".md");
+  /** Prefer <stem>.yaml, then .yml, then .md — extension is transport, not format. */
+  private findSchemaFile(stem: string): TFile | null {
+    const folder = this.schemasFolder;
+    for (const ext of SCHEMA_EXTENSIONS) {
+      const path = folder === "" ? `${stem}.${ext}` : `${folder}/${stem}.${ext}`;
+      const file = this.app.vault.getFileByPath(path);
+      if (file) return file;
+    }
+    return null;
   }
 
-  /** Re-read base.yaml and all sibling class manifests. */
   async reload(): Promise<void> {
     this.base = null;
-    this.classes = {};
+    this.manifests = {};
+    this.classLocations = [];
+    this.exceptions = [];
+    this.creationStamp = {};
     this.loadErrors = [];
-    this.sourceCache.clear();
 
-    const baseFile = this.app.vault.getFileByPath(this.basePath);
+    const baseFile = this.findSchemaFile(this.baseStem());
     if (!baseFile) {
-      this.loadErrors.push(`Base schema not found: ${this.basePath}`);
+      this.loadErrors.push(`Base schema not found: ${this.getSchemaPath()}`);
       return;
     }
 
-    const parsedBase = await this.parseFile(baseFile);
-    if (parsedBase === null) return;
-    this.base = parsedBase as BaseSchema;
+    const baseData = await this.parseFile(baseFile);
+    if (baseData === null) return;
+    this.base = await this.parseBase(baseData);
+    this.creationStamp = this.parseCreationStamp(baseData);
 
     const folder = this.app.vault.getFolderByPath(this.schemasFolder);
-    if (!(folder instanceof TFolder)) return;
-
-    for (const child of folder.children) {
-      if (!(child instanceof TFile)) continue;
-      if (child.path === this.basePath) continue;
-      if (child.extension !== "yaml" && child.extension !== "yml") continue;
-      const parsed = await this.parseFile(child);
-      if (parsed === null) continue;
-      const manifest = parsed as ClassManifest;
-      if (typeof manifest.class !== "string" || manifest.class.trim() === "") {
-        this.loadErrors.push(`${child.path}: missing top-level "class" key`);
-        continue;
+    if (folder instanceof TFolder) {
+      const seenStems = new Set<string>();
+      const children = folder.children
+        .filter((c): c is TFile => c instanceof TFile)
+        .filter((f) => SCHEMA_EXTENSIONS.includes(f.extension))
+        // .yaml before .yml before .md so the preferred transport wins per stem
+        .sort(
+          (a, b) =>
+            SCHEMA_EXTENSIONS.indexOf(a.extension) -
+              SCHEMA_EXTENSIONS.indexOf(b.extension) ||
+            a.path.localeCompare(b.path)
+        );
+      for (const child of children) {
+        const stem = child.basename;
+        if (stem === this.baseStem() || NON_MANIFEST_STEMS.includes(stem)) continue;
+        if (seenStems.has(stem)) continue;
+        seenStems.add(stem);
+        const data = await this.parseFile(child);
+        if (data === null) continue;
+        const manifest = await this.parseManifest(stem, data, child.path);
+        if (manifest) this.manifests[manifest.name] = manifest;
       }
-      if (this.classes[manifest.class]) {
-        this.loadErrors.push(`${child.path}: duplicate class "${manifest.class}"`);
-        continue;
-      }
-      this.classes[manifest.class] = manifest;
     }
+
+    this.classLocations = await this.loadClassLocations();
+    this.exceptions = await this.loadExceptions();
   }
 
-  /**
-   * Resolve every source list the loaded schema can reference: select: types across
-   * all class manifests plus any rule-configured source. Missing source notes are
-   * simply absent from the result (the engine fails open).
-   */
-  async resolveSources(): Promise<Record<string, string[]>> {
-    const names = new Set<string>();
-    for (const manifest of Object.values(this.classes)) {
-      for (const spec of Object.values(manifest.fields ?? {})) {
-        const type = spec?.type;
-        if (typeof type === "string" && type.startsWith("select:")) {
-          const name = type.slice("select:".length).trim();
-          if (name) names.add(name);
-        }
-      }
+  private async parseBase(data: Record<string, unknown>): Promise<BaseSchema> {
+    const fields: Record<string, FieldSpec> = {};
+    const rawFields = asRecord(data["fields"]);
+    for (const [name, spec] of Object.entries(rawFields)) {
+      const parsed = await this.parseField(name, asRecord(spec));
+      if (parsed) fields[name] = parsed;
     }
-    const areaRule = this.base?.rules?.["FM-AREA-INVALID"];
-    if (areaRule?.source) names.add(areaRule.source);
+    const tags = asRecord(data["tags"]);
+    const dates = asRecord(data["dates"]);
+    const presenceOnly =
+      (dates["presence_only"] as unknown[]) ??
+      (dates["linter_managed"] as unknown[]) ??
+      ["created"];
+    return {
+      version: Number(data["base_schema_version"] ?? 1),
+      fields,
+      tags: {
+        max_depth: Number(tags["max_depth"] ?? 2),
+        retired: stringList(tags["retired"]),
+      },
+      date_name_suffixes: Array.isArray(dates["name_suffixes"])
+        ? stringList(dates["name_suffixes"])
+        : ["_date", "_deadline"],
+      presence_only: stringList(presenceOnly),
+    };
+  }
 
-    const out: Record<string, string[]> = {};
-    for (const name of names) {
-      const values = await this.readSource(name);
-      if (values !== null) out[name] = values;
+  private parseCreationStamp(data: Record<string, unknown>): Record<string, string> {
+    const raw = asRecord(data["creation_stamp"]);
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof value === "string" || typeof value === "number") {
+        out[key] = String(value);
+      }
     }
     return out;
   }
 
-  /** Drop one cached source list (call when its note changes). */
-  invalidateSource(path: string): void {
-    for (const [name, _] of this.sourceCache) {
-      if (this.sourcePathFor(name) === path) this.sourceCache.delete(name);
+  private async parseManifest(
+    stem: string,
+    data: Record<string, unknown>,
+    path: string
+  ): Promise<Manifest | null> {
+    const name = typeof data["class"] === "string" && data["class"].trim() !== ""
+      ? (data["class"] as string)
+      : stem;
+    const fields: Record<string, FieldSpec> = {};
+    const rawFields = asRecord(data["fields"]);
+    for (const [fname, spec] of Object.entries(rawFields)) {
+      const parsed = await this.parseField(fname, asRecord(spec));
+      if (parsed) fields[fname] = parsed;
+      else this.loadErrors.push(`${path}: unknown type on field "${fname}"`);
     }
+    if (this.manifests[name]) {
+      this.loadErrors.push(`${path}: duplicate class "${name}"`);
+      return null;
+    }
+    return {
+      name,
+      version: Number(data["manifest_version"] ?? 1),
+      fields,
+      lifecycle: this.parseLifecycle(data["lifecycle"]),
+    };
   }
 
-  private sourcePathFor(name: string): string {
+  private parseLifecycle(raw: unknown): LifecycleRule[] {
+    if (!Array.isArray(raw)) return [];
+    const rules: LifecycleRule[] = [];
+    for (const entry of raw) {
+      const rec = asRecord(entry);
+      const dateField = rec["date_field"];
+      const suggest = rec["suggest"];
+      if (typeof dateField !== "string" || typeof suggest !== "string") continue;
+      rules.push({
+        date_field: dateField,
+        when_status: stringList(rec["when_status"]),
+        suggest,
+        age_days: rec["age_days"] == null ? null : Number(rec["age_days"]),
+      });
+    }
+    return rules;
+  }
+
+  /** Parse one field spec, resolving `select:<Source>` / `multi:<Source>` values. */
+  private async parseField(
+    name: string,
+    spec: Record<string, unknown>
+  ): Promise<FieldSpec | null> {
+    const rawType = String(spec["type"] ?? "text").trim();
+    let baseType = rawType;
+    let source: string | null = null;
+    let values: string[] | null = null;
+
+    const colon = rawType.indexOf(":");
+    if (colon !== -1) {
+      baseType = rawType.slice(0, colon).trim();
+      source = rawType.slice(colon + 1).trim();
+      values = await this.loadSourceValues(source);
+    }
+    if (!BASE_TYPES.includes(baseType as FieldType)) return null;
+
+    if (Array.isArray(spec["values"])) {
+      values = (spec["values"] as unknown[]).map((v) => String(v));
+    }
+
+    const rawWhen = asRecord(spec["required_when"]);
+    const requiredWhen =
+      typeof rawWhen["field"] === "string" && rawWhen["equals"] != null
+        ? { field: rawWhen["field"] as string, equals: String(rawWhen["equals"]) }
+        : null;
+
+    return {
+      name,
+      type: baseType as FieldType,
+      required: Boolean(spec["required"] ?? false),
+      required_unless:
+        spec["required_unless"] != null ? String(spec["required_unless"]) : null,
+      required_when: requiredWhen,
+      values,
+      source,
+    };
+  }
+
+  /** Read a line-per-value source note (every non-empty trimmed line is a value). */
+  private async loadSourceValues(sourceName: string): Promise<string[]> {
     const folder = this.sourcesFolder;
-    return folder === "" ? `${name}.md` : `${folder}/${name}.md`;
-  }
-
-  /** Read a line-list source note: one value per line, '#' lines and blanks skipped. */
-  private async readSource(name: string): Promise<string[] | null> {
-    const cached = this.sourceCache.get(name);
-    if (cached) return cached;
-
-    const file = this.app.vault.getFileByPath(this.sourcePathFor(name));
-    if (!file) return null;
-
+    const path =
+      folder === "" ? `${sourceName}.md` : `${folder}/${sourceName}.md`;
+    const file = this.app.vault.getFileByPath(path);
+    if (!file) {
+      this.loadErrors.push(`Metadata source note missing: ${path}`);
+      return [];
+    }
     const raw = await this.app.vault.cachedRead(file);
-    const lines = raw.split(/\r?\n/);
-    let start = 0;
-    if (lines[0]?.trim() === "---") {
-      const end = lines.indexOf("---", 1);
-      if (end !== -1) start = end + 1;
-    }
-    const values: string[] = [];
-    for (let i = start; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line === "" || line.startsWith("#")) continue;
-      values.push(line);
-    }
-    this.sourceCache.set(name, values);
-    return values;
+    return raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line !== "");
   }
 
-  private async parseFile(file: TFile): Promise<unknown | null> {
+  private async loadClassLocations(): Promise<ClassLocation[]> {
+    const file = this.findSchemaFile("class_locations");
+    if (!file) return [];
+    const data = await this.parseFile(file);
+    if (data === null) return [];
+    const out: ClassLocation[] = [];
+    for (const entry of Array.isArray(data["locations"]) ? data["locations"] : []) {
+      const rec = asRecord(entry);
+      if (typeof rec["prefix"] === "string" && typeof rec["class"] === "string") {
+        out.push({ prefix: rec["prefix"], class: rec["class"] });
+      } else {
+        this.loadErrors.push(`${file.path}: entry needs prefix + class`);
+      }
+    }
+    return out;
+  }
+
+  private async loadExceptions(): Promise<ExceptionRule[]> {
+    const file = this.findSchemaFile("exceptions");
+    if (!file) return [];
+    const data = await this.parseFile(file);
+    if (data === null) return [];
+    const out: ExceptionRule[] = [];
+    for (const entry of Array.isArray(data["exceptions"]) ? data["exceptions"] : []) {
+      const rec = asRecord(entry);
+      const hasPath = typeof rec["path"] === "string";
+      const hasPattern = typeof rec["pattern"] === "string";
+      if (hasPath === hasPattern) {
+        this.loadErrors.push(
+          `${file.path}: entry needs exactly one of path/pattern`
+        );
+        continue;
+      }
+      out.push({
+        path: hasPath ? (rec["path"] as string) : null,
+        pattern: hasPattern ? (rec["pattern"] as string) : null,
+        rules: Array.isArray(rec["rules"]) ? stringList(rec["rules"]) : null,
+        reason: typeof rec["reason"] === "string" ? rec["reason"] : null,
+      });
+    }
+    return out;
+  }
+
+  private async parseFile(file: TFile): Promise<Record<string, unknown> | null> {
     try {
       const raw = await this.app.vault.cachedRead(file);
       const parsed = parseYaml(raw);
-      if (parsed === null || typeof parsed !== "object") {
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
         this.loadErrors.push(`${file.path}: not a YAML mapping`);
         return null;
       }
-      return parsed;
+      return parsed as Record<string, unknown>;
     } catch (e) {
       this.loadErrors.push(`${file.path}: YAML parse error (${String(e)})`);
       return null;
     }
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((v) => String(v)) : [];
 }

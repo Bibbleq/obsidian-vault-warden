@@ -1,110 +1,172 @@
 /**
  * Core types for the Vault Warden rule engine.
  *
- * IMPORTANT: nothing in src/engine/ may import from "obsidian". The engine is a pure
- * function over plain data so it runs headless under vitest and stays contract-
- * compatible with external validators consuming the same fixture suite.
+ * This contract mirrors the Bibble-style Python validator's post-load data
+ * model (SchemaSet / Manifest / FieldSpec / Violation) so that both engines
+ * can run the same conformance fixtures with identical results. The Python
+ * engine is the reference implementation; where behaviour is ambiguous, match
+ * it.
+ *
+ * IMPORTANT: nothing in src/engine/ may import from "obsidian". The engine is
+ * a pure function over plain data so it runs headless under vitest.
  */
 
-/** Fix tier for a rule, declared per rule in base.yaml. */
-export type FixTier = "auto" | "confirm" | "none";
-
-/** Stable rule identifiers. */
+/** Stable rule identifiers — the write-time subset Warden implements. */
 export const RULE_IDS = [
+  "FM-AREA-MISSING",
+  "FM-AREA-INVALID",
+  "FM-NOTETYPE-MISSING",
+  "FM-NOTETYPE-INVALID",
+  "FM-ORIGIN-MISSING",
+  "FM-ORIGIN-INVALID",
+  "TAG-FORMAT",
+  "TAG-CASE",
+  "TAG-DEPTH",
+  "TAG-RETIRED",
+  "TAG-DUPLICATE",
+  "DATE-FORMAT",
+  "CREATED-MISSING",
+  "CLASS-UNKNOWN",
   "CLASS-FIELD-MISSING",
   "CLASS-FIELD-TYPE",
-  "DATE-FORMAT",
-  "TAG-CASE",
-  "TAG-RETIRED",
-  "FM-AREA-INVALID",
-  "CLASS-UNDECLARED",
+  "CLASS-FIELD-VALUE",
+  "CLASS-EXPECTED",
+  "CLASS-MISFILED",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
 
-/** Per-rule configuration as parsed from base.yaml's `rules:` map. */
-export interface RuleConfig {
-  fix: FixTier;
-  /** DATE-FORMAT: accepted patterns using YYYY MM DD HH mm ss tokens. */
-  formats?: string[];
-  /** TAG-CASE: case style; only "pascal" is currently supported. */
-  style?: string;
-  /** TAG-RETIRED: exact tag -> replacement ("" or null = remove). */
-  map?: Record<string, string | null>;
-  /** FM-AREA-INVALID: frontmatter key to check. */
-  field?: string;
-  /** FM-AREA-INVALID: source list name (resolved via metadata_sources). */
-  source?: string;
-}
+/** Field type grammar (after `select:<Source>` / `multi:<Source>` resolution). */
+export type FieldType =
+  | "date"
+  | "datetime"
+  | "select"
+  | "multi"
+  | "list"
+  | "wikilink"
+  | "text"
+  | "number"
+  | "url";
 
-/** Parsed base.yaml. */
-export interface BaseSchema {
-  version?: number;
-  metadata_sources?: string;
-  class_key?: string; // default "class"
-  ignore_key?: string; // default "validator_ignore"
-  frontmatter_title?: string;
-  class_locations?: Record<string, string>;
-  creation_stamp?: Record<string, string>;
-  rules?: Partial<Record<RuleId, RuleConfig>>;
-  title_sync?: {
-    strip?: string;
-    replacement?: string;
-    ignore?: string[];
-  };
-}
-
-/** A single field declaration in a class manifest. */
+/**
+ * One field declaration, post-load: `select:<Source>` / `multi:<Source>`
+ * types have already been split into `type` + `source`, with the source
+ * note's line-list resolved into `values` (missing source note -> empty
+ * `values`, which disables membership checking — fail open).
+ */
 export interface FieldSpec {
-  /** "date" | "select:<Source>" | "list" | "wikilink" | "text" */
-  type?: string;
+  name: string;
+  type: FieldType;
   required?: boolean;
+  /** Not required when this other frontmatter field is present (non-empty). */
+  required_unless?: string | null;
+  /** Required exactly when another field equals a value. */
+  required_when?: { field: string; equals: string } | null;
+  /** Closed value set; null/undefined/empty = open. */
+  values?: string[] | null;
+  /** Metadata Sources note the values came from (informational). */
+  source?: string | null;
 }
 
-/** Parsed class manifest. */
-export interface ClassManifest {
+export interface TagRules {
+  max_depth: number;
+  retired: string[];
+}
+
+/** Parsed base schema (base.yaml), post-load. */
+export interface BaseSchema {
+  version: number;
+  /** Base fields checked on every note: area / notetype / origin. */
+  fields: Record<string, FieldSpec>;
+  tags: TagRules;
+  /** Field-name suffixes that get DATE-FORMAT checks even without a class. */
+  date_name_suffixes: string[];
+  /** Date fields exempt from DATE-FORMAT (presence handled elsewhere). */
+  presence_only: string[];
+}
+
+/** One STATUS-STALE trigger. Parsed but unused by the write-time subset. */
+export interface LifecycleRule {
+  date_field: string;
+  when_status: string[];
+  suggest: string;
+  age_days?: number | null;
+}
+
+/** Parsed class manifest, post-load. */
+export interface Manifest {
+  name: string;
+  version: number;
+  fields: Record<string, FieldSpec>;
+  lifecycle?: LifecycleRule[];
+}
+
+/** One folder-prefix -> class mapping (class_locations.yaml). */
+export interface ClassLocation {
+  /** Vault-relative path prefix, usually with trailing "/". Longest match wins. */
+  prefix: string;
   class: string;
-  fields?: Record<string, FieldSpec>;
+}
+
+/** One exceptions.yaml entry. Exactly one of path/pattern is set. */
+export interface ExceptionRule {
+  /** Exact vault-relative path match. */
+  path?: string | null;
+  /** fnmatch-style glob (case-sensitive; `*`, `?`, `[seq]`). */
+  pattern?: string | null;
+  /** null/absent = full skip (no violations at all); else suppress these rules. */
+  rules?: string[] | null;
+  reason?: string | null;
 }
 
 /**
- * Everything the engine needs to validate one note. The Obsidian adapter builds this
- * from the vault; the test runner builds it from a JSON fixture.
+ * Everything the engine needs to validate one note. The Obsidian adapter
+ * builds this from the vault; the fixture runners build it from JSON.
  */
 export interface ValidationInput {
-  /** Parsed base.yaml. */
-  config: BaseSchema;
-  /** Class name -> manifest, for all loaded class manifests. */
-  classes: Record<string, ClassManifest>;
-  /** Source list name -> allowed values (pre-resolved line-list notes). */
-  sources: Record<string, string[]>;
-  /** The note under validation. */
+  base: BaseSchema;
+  /** Class name -> manifest. */
+  manifests: Record<string, Manifest>;
+  class_locations?: ClassLocation[];
+  exceptions?: ExceptionRule[];
   file: {
-    /** Vault-relative path, e.g. "Projects/Recipes/Flapjack.md". */
+    /** Vault-relative path, posix separators. */
     path: string;
-    /** Parsed frontmatter as plain data (JSON-representable). */
+    /** Parsed frontmatter as plain data; null when the note has none. */
     frontmatter: Record<string, unknown> | null;
   };
 }
 
-/** One rule violation. */
-export interface Violation {
-  rule: RuleId;
-  /** Frontmatter key, or the offending tag for tag rules. */
-  field?: string;
-  /** Stringified offending value. */
+/** A concrete fix operation, matching the Python engine's suggested_fix dicts. */
+export interface SuggestedFix {
+  op: "set_field" | "replace_tag" | "remove_tag" | "set_list" | "wrap_in_code";
+  field: string;
   found?: string;
-  /** Human-readable expectation. */
-  expected?: string;
-  /** Fix tier copied from the rule's config. */
-  fix: FixTier;
-  /** One-line human-readable description. */
-  message: string;
+  value?: unknown;
+  hint?: string;
 }
 
 /**
- * Signature of the engine entry point. Deterministic and side-effect free.
- * Violation order is not part of the contract; fixture comparison is
- * order-insensitive.
+ * One rule violation. Field names and semantics match the Python engine's
+ * Violation dataclass (minus `path`, which is implicit — one note per call).
+ */
+export interface Violation {
+  rule: RuleId;
+  field?: string | null;
+  /** Stringified offending value; null when the problem is absence. */
+  found?: string | null;
+  /** Human-readable expectation. */
+  expected?: string | null;
+  /** True when a deterministic fix exists (carried in suggested_fix). */
+  mechanical: boolean;
+  suggested_fix?: SuggestedFix | null;
+  /** True when suppressed by validator_ignore or a rule-scoped exception. */
+  suppressed: boolean;
+}
+
+/**
+ * Engine entry point. Deterministic and side-effect free; never throws on
+ * malformed input. A note fully skipped by exceptions returns [].
+ * Violation order is not part of the contract (fixtures compare as multisets).
  */
 export type Validate = (input: ValidationInput) => Violation[];

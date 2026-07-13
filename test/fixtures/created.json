@@ -1,0 +1,38 @@
+[
+  {
+    "name": "created missing entirely fires created-missing",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": {} },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created" }]
+  },
+  {
+    "name": "created present is clean",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": { "created": "2026-07-13" } },
+    "expect": []
+  },
+  {
+    "name": "created explicit null fires created-missing",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": { "created": null } },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created" }]
+  },
+  {
+    "name": "frontmatter null fires created-missing",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "file": { "path": "Note.md", "frontmatter": null },
+    "expect": [{ "rule": "CREATED-MISSING", "field": "created" }]
+  }
+]

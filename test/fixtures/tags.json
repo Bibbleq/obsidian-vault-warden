@@ -1,0 +1,407 @@
+[
+  {
+    "name": "spaced tag fails format",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "spaced tag"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags"
+      }
+    ]
+  },
+  {
+    "name": "leading hash prefix fails format",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "#Prefixed"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags"
+      }
+    ]
+  },
+  {
+    "name": "underscore in tag fails format",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "Bad_Tag"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags"
+      }
+    ]
+  },
+  {
+    "name": "non-string tag entry fails format",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          123
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags"
+      }
+    ]
+  },
+  {
+    "name": "single segment lowercase tag fires tag-case",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "microsoft"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-CASE",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "replace_tag",
+          "field": "tags",
+          "found": "microsoft",
+          "value": "Microsoft"
+        }
+      }
+    ]
+  },
+  {
+    "name": "second segment lowercase tag fires tag-case",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "Microsoft/copilot"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-CASE",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "replace_tag",
+          "field": "tags",
+          "found": "Microsoft/copilot",
+          "value": "Microsoft/Copilot"
+        }
+      }
+    ]
+  },
+  {
+    "name": "digit-leading segment is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "3DPrinting/Klipper"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "all caps acronym tag is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "MCCUG"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "tag deeper than max_depth fires tag-depth",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "A/B/C"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-DEPTH",
+        "field": "tags"
+      }
+    ]
+  },
+  {
+    "name": "one tag miscased too deep and retired fires all three rules",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": [
+          "Old/Tag/Here"
+        ]
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "old/tag/here"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-CASE",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "replace_tag",
+          "field": "tags",
+          "found": "old/tag/here",
+          "value": "Old/Tag/Here"
+        }
+      },
+      {
+        "rule": "TAG-DEPTH",
+        "field": "tags"
+      },
+      {
+        "rule": "TAG-RETIRED",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "remove_tag",
+          "field": "tags",
+          "found": "old/tag/here"
+        }
+      }
+    ]
+  },
+  {
+    "name": "retired match is case-insensitive",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": [
+          "OldTag"
+        ]
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "OLDTAG"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-RETIRED",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "remove_tag",
+          "field": "tags",
+          "found": "OLDTAG"
+        }
+      }
+    ]
+  },
+  {
+    "name": "bare string tags value is treated as a one-entry list and is clean",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": "MCCUG",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "hash-prefixed retired tag fires format and retired together",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": {
+        "max_depth": 2,
+        "retired": [
+          "Foo"
+        ]
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": [
+          "#Foo"
+        ],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags",
+        "found": "#Foo"
+      },
+      {
+        "rule": "TAG-RETIRED",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "remove_tag",
+          "field": "tags",
+          "found": "#Foo"
+        }
+      }
+    ]
+  }
+]

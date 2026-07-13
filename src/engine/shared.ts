@@ -1,125 +1,209 @@
 /**
- * Small pure helpers shared across the rule checks in validate.ts.
+ * Small pure helpers shared across the rule checks in validate.ts and dates.ts.
  *
- * Everything here is defensive by design: malformed or missing input (null
- * frontmatter, absent config keys, wrong-typed values) is treated leniently
- * rather than thrown on, per the engine's contract.
+ * Ported from the Bibble-style Python validator (`rules.py` / `class_locations.py`
+ * / `exceptions.py`). Everything here is defensive by design: malformed or
+ * missing input (null frontmatter, absent fields, wrong-typed values) is
+ * tolerated rather than thrown on, per the engine's contract.
  */
 
-import type { BaseSchema, FixTier, RuleConfig, RuleId } from "./types";
+import type { ClassLocation, ExceptionRule } from "./types";
 
 /** Frontmatter as the engine sees it: parsed YAML/JSON data, or null when a note has none. */
-export type Frontmatter = Record<string, unknown> | null;
+export type Frontmatter = Record<string, unknown> | null | undefined;
+
+/** Read a frontmatter key, tolerating null/non-object frontmatter. */
+export function fmGet(frontmatter: Frontmatter, key: string): unknown {
+  if (!frontmatter || typeof frontmatter !== "object") return undefined;
+  return (frontmatter as Record<string, unknown>)[key];
+}
 
 /**
- * A value counts as "missing" when the key is absent (undefined), null, an
- * empty/whitespace-only string, or an empty array.
+ * Port of `_is_empty`: null/undefined, whitespace-only string, empty array,
+ * or empty plain object (but not an empty Date or other object type).
  */
-export function isMissing(value: unknown): boolean {
-  if (value === undefined || value === null) return true;
+export function isEmpty(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
+  if (isPlainObject(value)) return Object.keys(value).length === 0;
   return false;
 }
 
-/** Best-effort stringification of an offending value for the `found` field. */
-export function stringify(value: unknown): string {
-  if (value === undefined) return "undefined";
-  if (value === null) return "null";
+/** True for plain objects (YAML mappings), false for arrays/Date/null/primitives. */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
+}
+
+/** True when `value` is an array or a plain object — used by list/text field checks. */
+export function isDictOrList(value: unknown): boolean {
+  return Array.isArray(value) || isPlainObject(value);
+}
+
+/** Port of `_as_list`: null/undefined -> [], array -> itself, anything else -> [value]. */
+export function asList(value: unknown): unknown[] {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) return value;
+  return [value];
+}
+
+/**
+ * Port of `_shown`: strings pass through as-is; non-strings are JSON-stringified
+ * (the Python reference uses `repr()`, but per the porting brief fixtures don't
+ * assert `found` values beyond strings, so JSON is the TS-idiomatic choice).
+ */
+export function shown(value: unknown): string {
   if (typeof value === "string") return value;
+  if (value === undefined) return "undefined";
   try {
-    return JSON.stringify(value);
+    const json = JSON.stringify(value);
+    return json ?? String(value);
   } catch {
     return String(value);
   }
 }
 
-/** Read a frontmatter key, tolerating a null/non-object frontmatter. */
-export function getField(frontmatter: Frontmatter, key: string): unknown {
-  if (!frontmatter || typeof frontmatter !== "object") return undefined;
-  return (frontmatter as Record<string, unknown>)[key];
-}
-
-/** `config.class_key`, defaulting to "class". */
-export function getClassKey(config: BaseSchema): string {
-  return config.class_key || "class";
-}
-
-/** `config.ignore_key`, defaulting to "validator_ignore". */
-export function getIgnoreKey(config: BaseSchema): string {
-  return config.ignore_key || "validator_ignore";
-}
-
 /**
- * The set of rule IDs this note opts out of, read from
- * frontmatter[ignore_key]. Accepts a bare string or an array of strings;
- * non-string array entries are ignored. Null/missing frontmatter or an
- * unusable value yields an empty set.
+ * Port of Python `==` for tag-duplicate detection: primitives compare with
+ * strict equality, non-primitives (arrays/objects) compare by JSON shape.
  */
-export function getIgnoredRules(frontmatter: Frontmatter, ignoreKey: string): Set<string> {
-  const raw = getField(frontmatter, ignoreKey);
-  if (typeof raw === "string") return new Set([raw]);
-  if (Array.isArray(raw)) {
-    return new Set(raw.filter((v): v is string => typeof v === "string"));
+export function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  const aIsPrimitive = a === null || (typeof a !== "object" && typeof a !== "function");
+  const bIsPrimitive = b === null || (typeof b !== "object" && typeof b !== "function");
+  if (aIsPrimitive || bIsPrimitive) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
   }
-  return new Set();
 }
 
 /**
- * Frontmatter tags, normalised: accepts a bare string or an array, drops
- * non-string entries, and strips a single leading "#" from each tag.
+ * Port of `pascal_case_tag`: strip all leading '#' runs, split on '/', then
+ * within each segment split on runs of -_/space and capitalize each chunk's
+ * first character. Also serves as the no-index degenerate case of
+ * `suggest_tag_casing` (the Python version's vault-wide casing memory is a
+ * batch-only feature; the write-time subset always falls back to this).
  */
-export function getTags(frontmatter: Frontmatter): string[] {
-  const raw = getField(frontmatter, "tags");
-  let list: unknown[];
-  if (typeof raw === "string") list = [raw];
-  else if (Array.isArray(raw)) list = raw;
-  else return [];
-  return list
-    .filter((t): t is string => typeof t === "string")
-    .map((t) => (t.startsWith("#") ? t.slice(1) : t));
+export function pascalCaseTag(tag: string): string {
+  const segments = tag.replace(/^#+/, "").split("/");
+  const fixed: string[] = [];
+  for (const segment of segments) {
+    const chunks = segment.split(/[-_ ]+/).filter((c) => c.length > 0);
+    fixed.push(chunks.map((c) => c[0].toUpperCase() + c.slice(1)).join(""));
+  }
+  return fixed.filter((part) => part.length > 0).join("/");
 }
 
 /**
- * The note's class name, if frontmatter[class_key] is a non-missing string.
- * Non-string class values (numbers, arrays, objects) resolve to no class,
- * since they can never match a manifest key.
+ * Port of `derive_area`: the longest valid area whose '/'-segments are a
+ * prefix of the note's own folder segments. Root-level notes (no folder) or
+ * folders matching no configured area return null.
  */
-export function resolveClassName(frontmatter: Frontmatter, classKey: string): string | undefined {
-  const value = getField(frontmatter, classKey);
-  if (typeof value !== "string" || isMissing(value)) return undefined;
-  return value;
-}
-
-/**
- * The class mapped by `class_locations` for this note's path, using
- * deepest-folder-wins matching. A note matches a folder when its path
- * starts with `folder + "/"`; an empty-string folder never matches.
- */
-export function findClassLocation(
-  path: string,
-  classLocations: Record<string, string> | undefined
-): string | undefined {
-  if (!classLocations) return undefined;
-  let bestFolder: string | undefined;
-  let bestClass: string | undefined;
-  for (const [folder, className] of Object.entries(classLocations)) {
-    if (folder === "") continue;
-    const prefix = `${folder}/`;
-    if (path.startsWith(prefix) && (bestFolder === undefined || folder.length > bestFolder.length)) {
-      bestFolder = folder;
-      bestClass = className;
+export function deriveArea(notePath: string, validAreas: string[]): string | null {
+  const idx = notePath.lastIndexOf("/");
+  const folder = idx >= 0 ? notePath.slice(0, idx) : "";
+  if (!folder) return null;
+  const folderSegments = folder.split("/");
+  let best: string | null = null;
+  let bestLen = 0;
+  for (const area of validAreas) {
+    const areaSegments = area.split("/");
+    const n = areaSegments.length;
+    if (n <= folderSegments.length && n > bestLen) {
+      let match = true;
+      for (let i = 0; i < n; i++) {
+        if (folderSegments[i] !== areaSegments[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        best = area;
+        bestLen = n;
+      }
     }
   }
-  return bestClass;
+  return best;
 }
 
-/** Look up a rule's config by ID; undefined means the rule never runs. */
-export function getRuleConfig(config: BaseSchema, id: RuleId): RuleConfig | undefined {
-  return config.rules?.[id];
+/** Escape one character for inclusion in a generated RegExp source string. */
+function escapeRegExpChar(ch: string): string {
+  return /[.*+?^${}()|[\]\\]/.test(ch) ? `\\${ch}` : ch;
 }
 
-/** The fix tier for a rule config, defaulting to "none" if malformed/absent. */
-export function fixTier(ruleConfig: RuleConfig | undefined): FixTier {
-  return ruleConfig?.fix ?? "none";
+/**
+ * Translate an fnmatch-style glob (`*`, `?`, `[seq]`/`[!seq]`) into an
+ * anchored, case-sensitive RegExp — a small port of Python's
+ * `fnmatch.translate`. Never throws: an unterminated `[` is treated as a
+ * literal bracket, matching Python's lenient fallback behaviour.
+ */
+export function fnmatchToRegExp(pattern: string): RegExp {
+  let i = 0;
+  const n = pattern.length;
+  let res = "";
+  while (i < n) {
+    const c = pattern[i];
+    i += 1;
+    if (c === "*") {
+      res += ".*";
+    } else if (c === "?") {
+      res += ".";
+    } else if (c === "[") {
+      let j = i;
+      if (j < n && (pattern[j] === "!" || pattern[j] === "]")) j += 1;
+      while (j < n && pattern[j] !== "]") j += 1;
+      if (j >= n) {
+        res += "\\[";
+      } else {
+        let stuff = pattern.slice(i, j).replace(/\\/g, "\\\\");
+        i = j + 1;
+        if (stuff.startsWith("!")) {
+          stuff = "^" + stuff.slice(1);
+        } else if (stuff.startsWith("^")) {
+          stuff = "\\" + stuff;
+        }
+        res += `[${stuff}]`;
+      }
+    } else {
+      res += escapeRegExpChar(c);
+    }
+  }
+  return new RegExp(`^${res}$`);
+}
+
+/** Does this exceptions.yaml entry match `path` — exact path or fnmatch pattern? */
+export function exceptionMatches(path: string, entry: ExceptionRule): boolean {
+  if (entry.path !== undefined && entry.path !== null) return path === entry.path;
+  if (entry.pattern !== undefined && entry.pattern !== null) {
+    try {
+      return fnmatchToRegExp(entry.pattern).test(path);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Port of `class_for_path`: the class of the longest configured prefix that
+ * `path` starts with (plain `startsWith`, no globbing). Ties keep whichever
+ * entry was encountered first.
+ */
+export function classForPath(path: string, locations: ClassLocation[]): string | null {
+  let best: string | null = null;
+  let bestLen = -1;
+  for (const loc of locations) {
+    if (path.startsWith(loc.prefix) && loc.prefix.length > bestLen) {
+      best = loc.class;
+      bestLen = loc.prefix.length;
+    }
+  }
+  return best;
+}
+
+/** Port of `prefixes_for_class`: every configured prefix mapped to `className`. */
+export function prefixesForClass(className: string, locations: ClassLocation[]): string[] {
+  return locations.filter((loc) => loc.class === className).map((loc) => loc.prefix);
 }
