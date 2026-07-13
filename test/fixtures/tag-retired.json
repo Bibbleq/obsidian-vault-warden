@@ -1,0 +1,63 @@
+[
+  {
+    "name": "exact match produces a violation with the replacement as expected",
+    "config": {
+      "rules": { "TAG-RETIRED": { "fix": "confirm", "map": { "OldTag": "NewTag" } } }
+    },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["OldTag"] }
+    },
+    "expect": [{ "rule": "TAG-RETIRED", "field": "OldTag", "expected": "NewTag" }]
+  },
+  {
+    "name": "empty string replacement means removal",
+    "config": {
+      "rules": { "TAG-RETIRED": { "fix": "confirm", "map": { "DeadTag": "" } } }
+    },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["DeadTag"] }
+    },
+    "expect": [{ "rule": "TAG-RETIRED", "field": "DeadTag", "expected": "" }]
+  },
+  {
+    "name": "null replacement also means removal",
+    "config": {
+      "rules": { "TAG-RETIRED": { "fix": "confirm", "map": { "DeadTag": null } } }
+    },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["DeadTag"] }
+    },
+    "expect": [{ "rule": "TAG-RETIRED", "field": "DeadTag", "expected": "" }]
+  },
+  {
+    "name": "non-matching tag is clean",
+    "config": {
+      "rules": { "TAG-RETIRED": { "fix": "confirm", "map": { "OldTag": "NewTag" } } }
+    },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["FreshTag"] }
+    },
+    "expect": []
+  },
+  {
+    "name": "retired tag that also fails case check fires both rules",
+    "config": {
+      "rules": {
+        "TAG-RETIRED": { "fix": "confirm", "map": { "old-tag": "NewTag" } },
+        "TAG-CASE": { "fix": "auto", "style": "pascal" }
+      }
+    },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["old-tag"] }
+    },
+    "expect": [
+      { "rule": "TAG-RETIRED", "field": "old-tag", "expected": "NewTag" },
+      { "rule": "TAG-CASE", "field": "old-tag" }
+    ]
+  }
+]

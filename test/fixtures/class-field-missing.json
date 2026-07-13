@@ -1,0 +1,150 @@
+[
+  {
+    "name": "required field absent produces a violation",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "title": { "type": "text", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget" }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-MISSING", "field": "title" }]
+  },
+  {
+    "name": "required field with null value produces a violation",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "title": { "type": "text", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "title": null }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-MISSING", "field": "title" }]
+  },
+  {
+    "name": "required field with empty string produces a violation",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "title": { "type": "text", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "title": "" }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-MISSING", "field": "title" }]
+  },
+  {
+    "name": "required field with whitespace-only string produces a violation",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "title": { "type": "text", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "title": "   " }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-MISSING", "field": "title" }]
+  },
+  {
+    "name": "required list field with empty list produces a violation",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "components": { "type": "list", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "components": [] }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-MISSING", "field": "components" }]
+  },
+  {
+    "name": "required field present with a value is clean",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "title": { "type": "text", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "title": "Sprocket" }
+    },
+    "expect": []
+  },
+  {
+    "name": "non-required field absent is clean",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "notes": { "type": "text", "required": false } }
+      }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget" }
+    },
+    "expect": []
+  },
+  {
+    "name": "note with no class declared is clean",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": { "title": { "type": "text", "required": true } }
+      }
+    },
+    "file": {
+      "path": "Misc/Note.md",
+      "frontmatter": {}
+    },
+    "expect": []
+  },
+  {
+    "name": "note whose class has no manifest produces no class-scoped violations",
+    "config": {
+      "rules": { "CLASS-FIELD-MISSING": { "fix": "confirm" } }
+    },
+    "classes": {},
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget" }
+    },
+    "expect": []
+  }
+]

@@ -1,0 +1,63 @@
+[
+  {
+    "name": "frontmatter null with no rules configured produces no violations",
+    "config": {},
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": null
+    },
+    "expect": []
+  },
+  {
+    "name": "empty config produces no violations regardless of frontmatter contents",
+    "config": {},
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "class": "Nonexistent", "whatever": 123 }
+    },
+    "expect": []
+  },
+  {
+    "name": "a note with many simultaneous violations reports all of them",
+    "config": {
+      "rules": {
+        "CLASS-FIELD-MISSING": { "fix": "confirm" },
+        "CLASS-FIELD-TYPE": { "fix": "none" },
+        "DATE-FORMAT": { "fix": "auto", "formats": ["YYYY-MM-DD"] },
+        "TAG-CASE": { "fix": "auto", "style": "pascal" },
+        "TAG-RETIRED": { "fix": "confirm", "map": { "OldTag": "NewTag" } },
+        "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" },
+        "CLASS-UNDECLARED": { "fix": "auto" }
+      }
+    },
+    "classes": {
+      "Widget": {
+        "class": "Widget",
+        "fields": {
+          "title": { "type": "text", "required": true },
+          "count": { "type": "text" },
+          "created": { "type": "date" }
+        }
+      }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": {
+        "class": "Widget",
+        "count": 42,
+        "created": "13/07/2026",
+        "area": "Mars",
+        "tags": ["microsoft", "OldTag"]
+      }
+    },
+    "expect": [
+      { "rule": "CLASS-FIELD-MISSING", "field": "title" },
+      { "rule": "CLASS-FIELD-TYPE", "field": "count" },
+      { "rule": "DATE-FORMAT", "field": "created" },
+      { "rule": "TAG-CASE", "field": "microsoft" },
+      { "rule": "TAG-RETIRED", "field": "OldTag", "expected": "NewTag" },
+      { "rule": "FM-AREA-INVALID", "field": "area" }
+    ]
+  }
+]

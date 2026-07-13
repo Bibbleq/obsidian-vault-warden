@@ -1,0 +1,83 @@
+[
+  {
+    "name": "plain pascal segments are clean",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["Microsoft/Copilot"] }
+    },
+    "expect": []
+  },
+  {
+    "name": "segment with leading digits is clean",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["3DPrinting/Klipper"] }
+    },
+    "expect": []
+  },
+  {
+    "name": "all-uppercase single segment is clean",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["MCCUG"] }
+    },
+    "expect": []
+  },
+  {
+    "name": "lowercase tag is a violation",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["microsoft"] }
+    },
+    "expect": [{ "rule": "TAG-CASE", "field": "microsoft" }]
+  },
+  {
+    "name": "lowercase second segment is a violation reported on the full tag",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["Microsoft/copilot"] }
+    },
+    "expect": [{ "rule": "TAG-CASE", "field": "Microsoft/copilot" }]
+  },
+  {
+    "name": "hyphenated lowercase tag is a violation",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["copilot-studio"] }
+    },
+    "expect": [{ "rule": "TAG-CASE", "field": "copilot-studio" }]
+  },
+  {
+    "name": "bare string tags value is handled like a single-item list",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": "microsoft" }
+    },
+    "expect": [{ "rule": "TAG-CASE", "field": "microsoft" }]
+  },
+  {
+    "name": "leading hash is stripped before checking",
+    "config": { "rules": { "TAG-CASE": { "fix": "auto", "style": "pascal" } } },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["#Microsoft/Copilot"] }
+    },
+    "expect": []
+  },
+  {
+    "name": "style not configured means the rule does not run",
+    "config": { "rules": {} },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "tags": ["microsoft"] }
+    },
+    "expect": []
+  }
+]

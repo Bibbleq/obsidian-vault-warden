@@ -1,0 +1,74 @@
+[
+  {
+    "name": "value in the source list is clean",
+    "config": {
+      "rules": { "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "area": "Home" }
+    },
+    "expect": []
+  },
+  {
+    "name": "value not in the source list is a violation",
+    "config": {
+      "rules": { "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "area": "Mars" }
+    },
+    "expect": [{ "rule": "FM-AREA-INVALID", "field": "area" }]
+  },
+  {
+    "name": "field absent is clean",
+    "config": {
+      "rules": { "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": {}
+    },
+    "expect": []
+  },
+  {
+    "name": "empty string value is clean because emptiness is class-field-missing's business",
+    "config": {
+      "rules": { "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "area": "" }
+    },
+    "expect": []
+  },
+  {
+    "name": "non-string value is a violation",
+    "config": {
+      "rules": { "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "area": 42 }
+    },
+    "expect": [{ "rule": "FM-AREA-INVALID", "field": "area" }]
+  },
+  {
+    "name": "applies to a note with no class at all",
+    "config": {
+      "rules": { "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Notes/Note.md",
+      "frontmatter": { "area": "Mars" }
+    },
+    "expect": [{ "rule": "FM-AREA-INVALID", "field": "area" }]
+  }
+]

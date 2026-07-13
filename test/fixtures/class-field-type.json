@@ -1,0 +1,185 @@
+[
+  {
+    "name": "text field holding a number is a type violation",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "label": { "type": "text" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "label": 42 }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "label" }]
+  },
+  {
+    "name": "text field holding a list is a type violation",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "label": { "type": "text" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "label": ["a", "b"] }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "label" }]
+  },
+  {
+    "name": "list field holding a string is a type violation",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "parts": { "type": "list" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "parts": "not a list" }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "parts" }]
+  },
+  {
+    "name": "wikilink with plain note name is clean",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "source": { "type": "wikilink" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "source": "[[Note]]" }
+    },
+    "expect": []
+  },
+  {
+    "name": "wikilink with alias is clean",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "source": { "type": "wikilink" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "source": "[[Note|alias]]" }
+    },
+    "expect": []
+  },
+  {
+    "name": "wikilink with heading is clean",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "source": { "type": "wikilink" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "source": "[[Note#heading]]" }
+    },
+    "expect": []
+  },
+  {
+    "name": "wikilink field holding a plain string is a type violation",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "source": { "type": "wikilink" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "source": "Note" }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "source" }]
+  },
+  {
+    "name": "date field holding a number is a type violation not a date-format violation",
+    "config": {
+      "rules": {
+        "CLASS-FIELD-TYPE": { "fix": "none" },
+        "DATE-FORMAT": { "fix": "auto", "formats": ["YYYY-MM-DD"] }
+      }
+    },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "created": { "type": "date" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "created": 20260713 }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "created" }]
+  },
+  {
+    "name": "select field holding a non-string is a type violation",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "status": { "type": "select:Statuses" } } }
+    },
+    "sources": { "Statuses": ["Open", "Closed"] },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "status": 5 }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "status" }]
+  },
+  {
+    "name": "select value not in the source list is a type violation",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "status": { "type": "select:Statuses" } } }
+    },
+    "sources": { "Statuses": ["Open", "Closed"] },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "status": "Pending" }
+    },
+    "expect": [{ "rule": "CLASS-FIELD-TYPE", "field": "status" }]
+  },
+  {
+    "name": "select value present in the source list is clean",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "status": { "type": "select:Statuses" } } }
+    },
+    "sources": { "Statuses": ["Open", "Closed"] },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "status": "Open" }
+    },
+    "expect": []
+  },
+  {
+    "name": "select field whose source list is absent from sources fails open",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "status": { "type": "select:Statuses" } } }
+    },
+    "sources": {},
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "status": "AnythingGoes" }
+    },
+    "expect": []
+  },
+  {
+    "name": "unknown field type string is clean",
+    "config": { "rules": { "CLASS-FIELD-TYPE": { "fix": "none" } } },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "mystery": { "type": "quantum" } } }
+    },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "mystery": 12345 }
+    },
+    "expect": []
+  },
+  {
+    "name": "select field that is also the fm-area-invalid field fires only fm-area-invalid",
+    "config": {
+      "rules": {
+        "CLASS-FIELD-TYPE": { "fix": "none" },
+        "FM-AREA-INVALID": { "fix": "confirm", "field": "area", "source": "Areas" }
+      }
+    },
+    "classes": {
+      "Widget": { "class": "Widget", "fields": { "area": { "type": "select:Areas" } } }
+    },
+    "sources": { "Areas": ["Home", "Work"] },
+    "file": {
+      "path": "Widgets/Sprocket.md",
+      "frontmatter": { "class": "Widget", "area": "Mars" }
+    },
+    "expect": [{ "rule": "FM-AREA-INVALID", "field": "area" }]
+  }
+]
