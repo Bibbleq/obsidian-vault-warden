@@ -237,6 +237,10 @@ export class SchemaLoader {
       version: Number(data["manifest_version"] ?? 1),
       fields,
       lifecycle: this.parseLifecycle(data["lifecycle"]),
+      body_template:
+        typeof data["body_template"] === "string" && data["body_template"].trim() !== ""
+          ? data["body_template"]
+          : null,
     };
   }
 

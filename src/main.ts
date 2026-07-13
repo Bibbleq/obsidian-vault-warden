@@ -3,7 +3,7 @@ import { applySuppressions, validate } from "./engine/validate";
 import { applyAllFixes, applyFixToFrontmatter } from "./engine/fixops";
 import { analyzeTitle } from "./engine/titlesync";
 import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
-import { setFirstH1 } from "./body";
+import { isBodyEmpty, renderScaffold, setFirstH1, splitFrontmatter } from "./body";
 import { SchemaLoader } from "./loader";
 import {
   DatePromptModal,
@@ -69,6 +69,22 @@ export default class VaultWardenPlugin extends Plugin {
       id: "open-violations",
       name: "Open violations pane",
       callback: () => void this.activateView(),
+    });
+    this.addCommand({
+      id: "insert-class-scaffold",
+      name: "Insert class scaffold",
+      callback: async () => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file || file.extension !== "md") return;
+        const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        const raw = fm?.["class"];
+        const className = Array.isArray(raw) ? raw[0] : raw;
+        if (typeof className !== "string" || className === "") {
+          new Notice("Vault Warden: note has no class.");
+          return;
+        }
+        await this.insertScaffold(file, className);
+      },
     });
     this.addCommand({
       id: "validate-current-note",
@@ -542,19 +558,65 @@ export default class VaultWardenPlugin extends Plugin {
     }
     if (!match) return;
     const stampClass = match;
-    const stamp = this.loader.creationStamp;
 
-    // Let template plugins finish writing first; skip if a class appeared meanwhile.
-    window.setTimeout(() => {
-      const current = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (current && current["class"] != null && current["class"] !== "") return;
-      void this.app.fileManager.processFrontMatter(file, (fm) => {
-        if (fm["class"] != null && fm["class"] !== "") return;
-        fm["class"] = stampClass;
-        for (const [key, value] of Object.entries(stamp)) {
-          if (fm[key] == null || fm[key] === "") fm[key] = resolveTokens(value);
+    // Let other plugins finish writing first; skip if a class appeared meanwhile.
+    window.setTimeout(() => void this.setupNewNote(file, stampClass), 800);
+  }
+
+  /** Full new-note setup: class + creation_stamp + field defaults + body scaffold. */
+  private async setupNewNote(file: TFile, className: string): Promise<void> {
+    const current = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    if (current && current["class"] != null && current["class"] !== "") return;
+
+    const manifest = this.loader.manifests[className];
+    const stamp = this.loader.creationStamp;
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      if (fm["class"] != null && fm["class"] !== "") return;
+      fm["class"] = className;
+      for (const [key, value] of Object.entries(stamp)) {
+        if (fm[key] == null || fm[key] === "") fm[key] = resolveTokens(value);
+      }
+      for (const [name, spec] of Object.entries(manifest?.fields ?? {})) {
+        if (spec.default === undefined) continue;
+        const cur = fm[name];
+        if (cur == null || cur === "" || (Array.isArray(cur) && cur.length === 0)) {
+          fm[name] = resolveTokens(spec.default);
         }
-      });
-    }, 800);
+      }
+    });
+    await this.insertScaffold(file, className, true);
+  }
+
+  /**
+   * Write the class's body scaffold into the note. Only ever writes into an
+   * empty body — pasted/imported content is never clobbered. Returns whether
+   * anything was inserted.
+   */
+  async insertScaffold(file: TFile, className: string, silent = false): Promise<boolean> {
+    const templatePath = this.loader.manifests[className]?.body_template;
+    if (!templatePath) {
+      if (!silent) new Notice(`Vault Warden: class ${className} has no body_template.`);
+      return false;
+    }
+    const templateFile = this.app.vault.getFileByPath(templatePath);
+    if (!templateFile) {
+      if (!silent) new Notice(`Vault Warden: template not found: ${templatePath}`);
+      return false;
+    }
+    const raw = await this.app.vault.cachedRead(templateFile);
+    const scaffold = renderScaffold(raw, file.basename, localToday());
+    if (scaffold.trim() === "") return false;
+
+    let inserted = false;
+    await this.app.vault.process(file, (data) => {
+      if (!isBodyEmpty(data)) return data;
+      inserted = true;
+      const { frontmatter } = splitFrontmatter(data);
+      return frontmatter + (frontmatter !== "" ? "\n" : "") + scaffold;
+    });
+    if (!inserted && !silent) {
+      new Notice("Vault Warden: note body is not empty — scaffold not inserted.");
+    }
+    return inserted;
   }
 }

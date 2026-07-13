@@ -94,6 +94,17 @@ lifecycle:                     # drives STATUS-STALE
 "apply class defaults" inserts defaults for missing fields. The same
 `{{today}}`/`{{now}}` tokens work in the base schema's `creation_stamp` values.
 
+A manifest may also declare a top-level `body_template:` (plugin-side) — the
+vault-relative path of a markdown file whose **body** scaffolds new notes of
+this class: the template's own frontmatter is discarded (the manifest owns
+frontmatter), and the deliberately tiny token set — `{{title}}` and
+`{{date}}`, no logic — is substituted. Scaffolds are only ever written into
+empty note bodies; an "Insert class scaffold" command covers existing notes.
+
+```yaml
+body_template: "_vault/Templates/Recipe.md"
+```
+
 ### Field type grammar
 
 `date`, `datetime`, `list`, `wikilink`, `text`, `number`, `url`,

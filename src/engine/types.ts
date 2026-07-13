@@ -135,6 +135,12 @@ export interface Manifest {
   version: number;
   fields: Record<string, FieldSpec>;
   lifecycle?: LifecycleRule[];
+  /**
+   * Vault-relative path of a markdown file whose BODY (frontmatter stripped,
+   * {{title}}/{{date}} substituted) scaffolds new notes of this class.
+   * Plugin-side; batch validators ignore it.
+   */
+  body_template?: string | null;
 }
 
 /** One folder-prefix -> class mapping (class_locations.yaml). */
