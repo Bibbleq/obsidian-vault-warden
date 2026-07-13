@@ -111,13 +111,18 @@ export class WardenView extends ItemView {
 
     const actions = item.createEl("div", { cls: "vault-warden-item-actions" });
     if (violation.mechanical && violation.suggested_fix) {
+      const op = violation.suggested_fix.op;
+      const value = violation.suggested_fix.value;
       const label =
-        violation.suggested_fix.op === "remove_tag"
+        op === "remove_tag"
           ? "Remove"
-          : violation.suggested_fix.op === "set_field" &&
-              violation.suggested_fix.value != null
-            ? `Fix → ${String(violation.suggested_fix.value)}`
-            : "Fix";
+          : op === "rename_file"
+            ? `Rename → ${String(value ?? "")}`
+            : op === "set_h1"
+              ? "Fix H1"
+              : op === "set_field" && value != null
+                ? `Fix → ${String(value)}`
+                : "Fix";
       const fixBtn = actions.createEl("button", { text: label, cls: "mod-cta" });
       fixBtn.addEventListener("click", () => void this.plugin.applyFixes([violation]));
     }

@@ -7,6 +7,7 @@ import type {
   FieldType,
   LifecycleRule,
   Manifest,
+  TitleSyncConfig,
 } from "./engine/types";
 
 const BASE_TYPES: FieldType[] = [
@@ -43,6 +44,8 @@ export class SchemaLoader {
   exceptions: ExceptionRule[] = [];
   /** Extra keys the creation hook stamps alongside class (plugin-only config). */
   creationStamp: Record<string, string> = {};
+  /** Filename<->H1 sync config; null = feature off (no title_sync block). */
+  titleSync: TitleSyncConfig | null = null;
   /** Human-readable problems from the last load. */
   loadErrors: string[] = [];
 
@@ -110,6 +113,7 @@ export class SchemaLoader {
     this.classLocations = [];
     this.exceptions = [];
     this.creationStamp = {};
+    this.titleSync = null;
     this.loadErrors = [];
 
     const baseFile = this.findSchemaFile(this.baseStem());
@@ -122,6 +126,7 @@ export class SchemaLoader {
     if (baseData === null) return;
     this.base = await this.parseBase(baseData);
     this.creationStamp = this.parseCreationStamp(baseData);
+    this.titleSync = this.parseTitleSync(baseData);
 
     const folder = this.app.vault.getFolderByPath(this.schemasFolder);
     if (folder instanceof TFolder) {
@@ -188,6 +193,24 @@ export class SchemaLoader {
       }
     }
     return out;
+  }
+
+  private parseTitleSync(data: Record<string, unknown>): TitleSyncConfig | null {
+    if (data["title_sync"] == null) return null;
+    const raw = asRecord(data["title_sync"]);
+    const remap: Record<string, string> = {};
+    for (const [key, value] of Object.entries(asRecord(raw["remap"]))) {
+      if (typeof value === "string") remap[key] = value;
+    }
+    return {
+      strip: typeof raw["strip"] === "string" ? raw["strip"] : "",
+      replacement: typeof raw["replacement"] === "string" ? raw["replacement"] : "",
+      remap,
+      ignore: stringList(raw["ignore"]),
+      frontmatter_title:
+        typeof raw["frontmatter_title"] === "string" ? raw["frontmatter_title"] : "",
+      add_old_alias: Boolean(raw["add_old_alias"] ?? false),
+    };
   }
 
   private async parseManifest(

@@ -18,11 +18,30 @@ import {
 
 export interface VaultWardenSettings {
   schemaPath: string;
+  /** Rule ID -> apply its mechanical fix automatically (default: manual). */
+  autoFix: Record<string, boolean>;
 }
 
 export const DEFAULT_SETTINGS: VaultWardenSettings = {
   schemaPath: "_vault/Metadata Sources/Schemas/Vault.yaml",
+  autoFix: {},
 };
+
+/** Every rule with a mechanical fix, i.e. everything the auto/manual choice applies to. */
+const FIXABLE_RULES: { id: string; desc: string }[] = [
+  { id: "FM-AREA-MISSING", desc: "Derive the area from the note's folder path" },
+  { id: "TAG-FORMAT", desc: "Split comma-joined tags; re-case malformed tags" },
+  { id: "TAG-CASE", desc: "Re-case miscased tags (PascalCase)" },
+  { id: "TAG-RETIRED", desc: "Remove retired tags" },
+  { id: "TAG-DUPLICATE", desc: "De-duplicate the tags list" },
+  { id: "DATE-FORMAT", desc: "Convert space-separated datetimes to ISO (T) form" },
+  { id: "CLASS-EXPECTED", desc: "Stamp the class mapped to the note's folder" },
+  { id: "H1-MISSING", desc: "Insert an H1 from the filename" },
+  { id: "H1-WHITESPACE", desc: "Trim cosmetic whitespace in the H1" },
+  { id: "H1-DEGENERATE", desc: "Restore an empty/punctuation-only H1 from the filename" },
+  { id: "FILENAME-SYNC", desc: "Rename the file to follow the H1 (backlinks update)" },
+  { id: "TITLE-PROPERTY", desc: "Keep the configured title property equal to the H1" },
+];
 
 /** Suggests schema-capable files (.yaml/.yml/.md) while typing the schema path. */
 class SchemaFileSuggest extends AbstractInputSuggest<TFile> {
@@ -93,6 +112,30 @@ export class VaultWardenSettingTab extends PluginSettingTab {
           this.updateStatus();
         });
       });
+
+    containerEl.createEl("h3", { text: "Fix application" });
+    containerEl.createEl("p", {
+      cls: "vault-warden-rules-note",
+      text:
+        "Manual: the fix is a button in the violations pane. Automatic: the fix is " +
+        "applied silently whenever the violation is detected on the active note.",
+    });
+    for (const { id, desc } of FIXABLE_RULES) {
+      new Setting(containerEl)
+        .setName(id)
+        .setDesc(desc)
+        .addDropdown((dd) =>
+          dd
+            .addOption("manual", "Manual")
+            .addOption("auto", "Automatic")
+            .setValue(this.plugin.settings.autoFix[id] ? "auto" : "manual")
+            .onChange(async (value) => {
+              this.plugin.settings.autoFix[id] = value === "auto";
+              await this.plugin.saveSettings();
+              await this.plugin.validateActiveFile();
+            })
+        );
+    }
 
     this.statusEl = containerEl.createDiv({ cls: "vault-warden-settings-status" });
     this.updateStatus();

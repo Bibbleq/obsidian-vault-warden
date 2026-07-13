@@ -36,6 +36,35 @@ export const RULE_IDS = [
 
 export type RuleId = (typeof RULE_IDS)[number];
 
+/**
+ * Plugin-only rules (filename <-> H1 sync). Not part of the shared batch
+ * contract, so they never appear in the conformance fixtures.
+ */
+export const TITLE_RULE_IDS = [
+  "H1-MISSING",
+  "H1-WHITESPACE",
+  "H1-DEGENERATE",
+  "FILENAME-SYNC",
+  "TITLE-PROPERTY",
+] as const;
+
+export type TitleRuleId = (typeof TITLE_RULE_IDS)[number];
+
+/** `title_sync:` block from the vault schema (plugin-only). */
+export interface TitleSyncConfig {
+  /** Characters removed when projecting H1 -> filename. */
+  strip: string;
+  replacement: string;
+  /** Character remappings applied before stripping (smart quotes etc.). */
+  remap: Record<string, string>;
+  /** Regexes (no lookbehinds); any match on the vault path exempts the note. */
+  ignore: string[];
+  /** Frontmatter property kept equal to the H1; "" = disabled. */
+  frontmatter_title: string;
+  /** On rename, add the old filename to aliases. */
+  add_old_alias: boolean;
+}
+
 /** Field type grammar (after `select:<Source>` / `multi:<Source>` resolution). */
 export type FieldType =
   | "date"
@@ -137,9 +166,20 @@ export interface ValidationInput {
   };
 }
 
-/** A concrete fix operation, matching the Python engine's suggested_fix dicts. */
+/**
+ * A concrete fix operation. The first five match the Python engine's
+ * suggested_fix dicts; set_h1 and rename_file are plugin-only title-sync ops
+ * (they touch the note body / the file itself, not frontmatter).
+ */
 export interface SuggestedFix {
-  op: "set_field" | "replace_tag" | "remove_tag" | "set_list" | "wrap_in_code";
+  op:
+    | "set_field"
+    | "replace_tag"
+    | "remove_tag"
+    | "set_list"
+    | "wrap_in_code"
+    | "set_h1"
+    | "rename_file";
   field: string;
   found?: string;
   value?: unknown;
@@ -151,7 +191,7 @@ export interface SuggestedFix {
  * Violation dataclass (minus `path`, which is implicit — one note per call).
  */
 export interface Violation {
-  rule: RuleId;
+  rule: RuleId | TitleRuleId;
   field?: string | null;
   /** Stringified offending value; null when the problem is absence. */
   found?: string | null;

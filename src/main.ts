@@ -1,7 +1,9 @@
-import { Plugin, TAbstractFile, TFile, debounce } from "obsidian";
-import { validate } from "./engine/validate";
+import { Notice, Plugin, TAbstractFile, TFile, debounce } from "obsidian";
+import { applySuppressions, validate } from "./engine/validate";
 import { applyAllFixes, applyFixToFrontmatter } from "./engine/fixops";
+import { analyzeTitle } from "./engine/titlesync";
 import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
+import { setFirstH1 } from "./body";
 import { SchemaLoader } from "./loader";
 import { TextPromptModal, ValueSuggestModal } from "./modals";
 import {
@@ -93,7 +95,12 @@ export default class VaultWardenPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = (await this.loadData()) ?? {};
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...data,
+      autoFix: { ...DEFAULT_SETTINGS.autoFix, ...(data.autoFix ?? {}) },
+    };
   }
 
   async saveSettings(): Promise<void> {
@@ -105,10 +112,14 @@ export default class VaultWardenPlugin extends Plugin {
     await this.validateActiveFile();
   }
 
-  /** Validate the active markdown file and refresh badge + pane. */
+  /** Guards against auto-fix re-entrancy (fixes trigger change events). */
+  private autoFixing = false;
+
+  /** Validate the active markdown file, auto-apply configured fixes, refresh UI. */
   async validateActiveFile(): Promise<void> {
     const file = this.app.workspace.getActiveFile();
-    if (!file || file.extension !== "md" || !this.loader.base) {
+    const base = this.loader.base;
+    if (!file || file.extension !== "md" || !base) {
       this.violations = [];
       this.validatedFile = null;
       this.updateBadge(null);
@@ -116,26 +127,54 @@ export default class VaultWardenPlugin extends Plugin {
       return;
     }
     this.validatedFile = file;
-    this.violations = validate(this.buildInput(file));
-    this.updateBadge(this.violations.filter((v) => !v.suppressed).length);
-    this.refreshView();
-  }
 
-  private buildInput(file: TFile): ValidationInput {
     const cache = this.app.metadataCache.getFileCache(file);
     let frontmatter: Record<string, unknown> | null = null;
     if (cache?.frontmatter) {
       frontmatter = { ...cache.frontmatter };
       delete (frontmatter as Record<string, unknown>)["position"];
     }
-    return {
-      // buildInput is only called when loader.base is set.
-      base: this.loader.base!,
+
+    const input: ValidationInput = {
+      base,
       manifests: this.loader.manifests,
       class_locations: this.loader.classLocations,
       exceptions: this.loader.exceptions,
       file: { path: file.path, frontmatter },
     };
+    let all = validate(input);
+
+    const titleConfig = this.loader.titleSync;
+    if (titleConfig) {
+      const h1 = cache?.headings?.find((h) => h.level === 1)?.heading ?? null;
+      const titleViolations = analyzeTitle({
+        path: file.path,
+        basename: file.basename,
+        h1,
+        frontmatter,
+        config: titleConfig,
+      });
+      all = all.concat(
+        applySuppressions(frontmatter, file.path, this.loader.exceptions, titleViolations)
+      );
+    }
+
+    this.violations = all;
+    this.updateBadge(all.filter((v) => !v.suppressed).length);
+    this.refreshView();
+
+    // Auto-apply fixes for rules the user has set to Automatic.
+    const auto = all.filter(
+      (v) => v.mechanical && !v.suppressed && v.suggested_fix && this.settings.autoFix[v.rule]
+    );
+    if (auto.length > 0 && !this.autoFixing) {
+      this.autoFixing = true;
+      try {
+        await this.applyFixes(auto);
+      } finally {
+        this.autoFixing = false;
+      }
+    }
   }
 
   async activateView(): Promise<void> {
@@ -156,14 +195,75 @@ export default class VaultWardenPlugin extends Plugin {
     }
   }
 
-  /** Apply the mechanical suggested_fix of the given violations in ONE frontmatter write. */
+  /**
+   * Apply the mechanical suggested_fix of the given violations: frontmatter
+   * fixes in ONE processFrontMatter pass, then H1 body repairs, then a rename
+   * last (it changes the path).
+   */
   async applyFixes(violations: Violation[]): Promise<void> {
     const file = this.validatedFile;
     if (!file) return;
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      applyAllFixes(fm, violations);
-    });
-    // metadataCache 'changed' re-validates; nothing else to do.
+    const eligible = violations.filter((v) => v.mechanical && !v.suppressed && v.suggested_fix);
+
+    const frontmatterFixes = eligible.filter(
+      (v) => v.suggested_fix!.op !== "set_h1" && v.suggested_fix!.op !== "rename_file"
+    );
+    const h1Fixes = eligible.filter((v) => v.suggested_fix!.op === "set_h1");
+    const rename = eligible.find((v) => v.suggested_fix!.op === "rename_file");
+
+    if (frontmatterFixes.length > 0) {
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        applyAllFixes(fm, frontmatterFixes);
+      });
+    }
+    for (const fix of h1Fixes) {
+      await this.applyH1(file, String(fix.suggested_fix!.value ?? ""));
+    }
+    if (rename) {
+      await this.applyRename(file, String(rename.suggested_fix!.value ?? ""));
+    }
+    // Frontmatter/body writes re-validate via metadataCache 'changed'; a
+    // rename doesn't, so re-validate explicitly (guarded, cheap no-op otherwise).
+    if (rename) await this.validateActiveFile();
+  }
+
+  /** Repair or insert the note's first H1. */
+  private async applyH1(file: TFile, title: string): Promise<void> {
+    if (title.trim() === "") return;
+    await this.app.vault.process(file, (data) => setFirstH1(data, title));
+  }
+
+  /** Rename the file to follow its H1, honouring the spec's hard guards. */
+  private async applyRename(file: TFile, candidate: string): Promise<void> {
+    const target = candidate.trim();
+    if (target === "" || target === file.basename) return;
+    // Never rename on a whitespace-only difference.
+    if (target.replace(/\s+/g, "") === file.basename.replace(/\s+/g, "")) return;
+
+    const parent = file.parent?.path ?? "";
+    const newPath =
+      (parent !== "" && parent !== "/" ? parent + "/" : "") + target + "." + file.extension;
+    if (this.app.vault.getAbstractFileByPath(newPath)) {
+      new Notice(`Vault Warden: "${newPath}" already exists — not renaming.`);
+      return;
+    }
+
+    const oldName = file.basename;
+    await this.app.fileManager.renameFile(file, newPath);
+    if (this.loader.titleSync?.add_old_alias) {
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        const raw = fm["aliases"];
+        const aliases = Array.isArray(raw)
+          ? raw
+          : typeof raw === "string" && raw !== ""
+            ? [raw]
+            : [];
+        if (!aliases.includes(oldName)) {
+          aliases.push(oldName);
+          fm["aliases"] = aliases;
+        }
+      });
+    }
   }
 
   /** Manual override: prompt for a value (schema-fed picker where possible), then set it. */
@@ -171,6 +271,21 @@ export default class VaultWardenPlugin extends Plugin {
     const file = this.validatedFile;
     const field = violationToFix.field;
     if (!file || !field) return;
+
+    // Title-sync violations edit the H1 or the filename, not frontmatter.
+    const op = violationToFix.suggested_fix?.op;
+    if (op === "set_h1" || op === "rename_file") {
+      const initial =
+        violationToFix.expected ?? String(violationToFix.suggested_fix?.value ?? "");
+      new TextPromptModal(
+        this.app,
+        op === "set_h1" ? "Set H1" : "Rename file to",
+        initial,
+        (value) =>
+          void (op === "set_h1" ? this.applyH1(file, value) : this.applyRename(file, value))
+      ).open();
+      return;
+    }
 
     const apply = (value: string) => void this.applyManualValue(violationToFix, value);
     const allowed = this.allowedValuesFor(file, field);

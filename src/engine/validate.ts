@@ -478,6 +478,30 @@ function applyIgnoreSuppression(frontmatter: Frontmatter, violations: Violation[
 }
 
 /**
+ * Apply validator_ignore + exception suppression to externally-produced
+ * violations (e.g. the plugin's title-sync rules) with the same semantics the
+ * engine uses internally. Returns [] when a full-skip exception matches.
+ */
+export function applySuppressions(
+  frontmatter: Frontmatter,
+  path: string,
+  exceptions: ExceptionRule[] | undefined,
+  violations: Violation[]
+): Violation[] {
+  const matched = (exceptions ?? []).filter((e) => exceptionMatches(path, e));
+  if (matched.some((e) => e.rules === null || e.rules === undefined)) return [];
+  applyIgnoreSuppression(frontmatter, violations);
+  const byException = new Set<string>();
+  for (const e of matched) {
+    if (e.rules) for (const ruleId of e.rules) byException.add(ruleId);
+  }
+  for (const v of violations) {
+    if (byException.has(v.rule)) v.suppressed = true;
+  }
+  return violations;
+}
+
+/**
  * Validate one note against the loaded schema/manifests/class-locations/
  * exceptions. Deterministic and side-effect free; never throws, even on
  * malformed or missing input. A note fully skipped by an exceptions.yaml
