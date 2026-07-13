@@ -17,12 +17,12 @@ accepted as equivalent transport. `.yaml` wins when both exist.
 
 | stem | purpose |
 |---|---|
-| `base` | vault-wide schema: base fields, tag rules, date rules |
+| `Vault` / `vault` (legacy: `base`) | vault-wide schema: base fields, tag rules, date rules |
 | `class_locations` | folder-prefix → class map (optional) |
 | `exceptions` | notes deliberately outside the rules (optional) |
 | anything else | one class manifest per file |
 
-## base.yaml
+## Vault.yaml
 
 ```yaml
 base_schema_version: 2

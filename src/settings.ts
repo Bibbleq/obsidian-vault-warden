@@ -21,7 +21,7 @@ export interface VaultWardenSettings {
 }
 
 export const DEFAULT_SETTINGS: VaultWardenSettings = {
-  schemaPath: "_vault/Metadata Sources/Schemas/base.yaml",
+  schemaPath: "_vault/Metadata Sources/Schemas/Vault.yaml",
 };
 
 /** Suggests schema-capable files (.yaml/.yml/.md) while typing the schema path. */
@@ -68,11 +68,12 @@ export class VaultWardenSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Base schema file")
+      .setName("Vault schema file")
       .setDesc(
-        "Vault-relative path to the base schema. Class manifests, class_locations, " +
-          "and exceptions are the other YAML (or YAML-as-.md) files in the same folder; " +
-          "select-source notes live in the folder above it."
+        "Vault-relative path to the vault-wide schema (e.g. Vault.yaml). Class " +
+          "manifests, class_locations, and exceptions are the other YAML (or " +
+          "YAML-as-.md) files in the same folder; select-source notes live in the " +
+          "folder above it."
       )
       .addText((text) => {
         text

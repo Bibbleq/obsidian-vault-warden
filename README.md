@@ -52,7 +52,7 @@ as they land.
 ## Schema format
 
 See [`docs/SCHEMA.md`](docs/SCHEMA.md) for the full manifest format: the
-`base.yaml` structure and how class manifests declare their fields.
+`Vault.yaml` structure and how class manifests declare their fields.
 
 ## Conformance fixtures
 

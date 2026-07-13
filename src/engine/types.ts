@@ -73,7 +73,7 @@ export interface TagRules {
   retired: string[];
 }
 
-/** Parsed base schema (base.yaml), post-load. */
+/** Parsed vault-wide schema (Vault.yaml), post-load. */
 export interface BaseSchema {
   version: number;
   /** Base fields checked on every note: area / notetype / origin. */

@@ -22,7 +22,7 @@ const BASE_TYPES: FieldType[] = [
 ];
 
 /** Stems in the schemas folder that are not class manifests. */
-const NON_MANIFEST_STEMS = ["base", "exceptions", "class_locations"];
+const NON_MANIFEST_STEMS = ["Vault", "vault", "base", "exceptions", "class_locations"];
 
 /** Schema files may travel as .yaml or .md (Obsidian Sync transport); .yaml wins. */
 const SCHEMA_EXTENSIONS = ["yaml", "yml", "md"];

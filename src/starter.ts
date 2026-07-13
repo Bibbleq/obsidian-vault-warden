@@ -4,7 +4,7 @@
  * own vault. See docs/SCHEMA.md for the full format.
  */
 
-export const STARTER_BASE_YAML = `# Vault Warden base schema — applies to every note in the vault.
+export const STARTER_BASE_YAML = `# Vault Warden vault schema — applies to every note in the vault.
 # See the plugin's docs/SCHEMA.md for the full format.
 base_schema_version: 1
 
@@ -44,8 +44,8 @@ creation_stamp:
 `;
 
 export const STARTER_CLASS_YAML = `# Example Vault Warden class manifest — one file like this per note class,
-# in the same folder as base.yaml. The class: key is authoritative; the
-# filename is convention only.
+# in the same folder as the vault schema. The class: key is authoritative;
+# the filename is convention only.
 manifest_version: 1
 class: ExampleClass
 fields:
