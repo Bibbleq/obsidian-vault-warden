@@ -5,13 +5,37 @@ import { analyzeTitle } from "./engine/titlesync";
 import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
 import { setFirstH1 } from "./body";
 import { SchemaLoader } from "./loader";
-import { DatePromptModal, TextPromptModal, ValueSuggestModal } from "./modals";
+import {
+  DatePromptModal,
+  FileLinkSuggestModal,
+  TextPromptModal,
+  ValueSuggestModal,
+} from "./modals";
 import {
   DEFAULT_SETTINGS,
   VaultWardenSettings,
   VaultWardenSettingTab,
 } from "./settings";
 import { VIEW_TYPE_WARDEN, WardenView } from "./view";
+
+/** Local date as YYYY-MM-DD (the engine's `today` injection). */
+function localToday(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** Resolve {{today}} / {{now}} tokens in defaults and creation_stamp values. */
+function resolveTokens(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  if (value === "{{today}}") return localToday();
+  if (value === "{{now}}") {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${localToday()}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+  return value;
+}
 
 export default class VaultWardenPlugin extends Plugin {
   settings: VaultWardenSettings = DEFAULT_SETTINGS;
@@ -137,6 +161,7 @@ export default class VaultWardenPlugin extends Plugin {
       class_locations: this.loader.classLocations,
       exceptions: this.loader.exceptions,
       file: { path: file.path, frontmatter },
+      today: localToday(),
     };
     let all = validate(input);
 
@@ -378,6 +403,97 @@ export default class VaultWardenPlugin extends Plugin {
     });
   }
 
+  // --- field editor (properties section of the pane) -----------------------
+
+  /** Set one frontmatter field (scalar). */
+  async setField(file: TFile, field: string, value: unknown): Promise<void> {
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      fm[field] = value;
+    });
+  }
+
+  /** Append a value to a list field (creates/normalises the list). */
+  async addToListField(file: TFile, field: string, value: unknown): Promise<void> {
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      const current = fm[field];
+      const list = Array.isArray(current)
+        ? current.slice()
+        : current == null || current === ""
+          ? []
+          : [current];
+      if (!list.some((item) => item === value)) list.push(value);
+      fm[field] = list;
+    });
+  }
+
+  /** Remove a value from a list field. */
+  async removeFromListField(file: TFile, field: string, value: unknown): Promise<void> {
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      const current = fm[field];
+      if (Array.isArray(current)) {
+        fm[field] = current.filter((item) => item !== value);
+      } else if (current === value) {
+        delete fm[field];
+      }
+    });
+  }
+
+  /** Open the right editor widget for a field and write the chosen value. */
+  editField(file: TFile, field: string, spec: FieldSpec | null): void {
+    const isList = spec?.type === "multi" || spec?.type === "list";
+    const write = (value: unknown) =>
+      void (isList ? this.addToListField(file, field, value) : this.setField(file, field, value));
+
+    if (spec?.values && spec.values.length > 0) {
+      new ValueSuggestModal(this.app, spec.values, `Value for ${field}…`, write).open();
+      return;
+    }
+    if (spec?.type === "date" || spec?.type === "datetime") {
+      new DatePromptModal(this.app, `Set ${field}`, null, write).open();
+      return;
+    }
+    if (spec?.type === "wikilink") {
+      new FileLinkSuggestModal(this.app, (linkText) => write(linkText)).open();
+      return;
+    }
+    new TextPromptModal(this.app, `Set ${field}`, "", (raw) => {
+      const value =
+        spec?.type === "number" && raw.trim() !== "" && !isNaN(Number(raw)) ? Number(raw) : raw;
+      write(value);
+    }).open();
+  }
+
+  /** Pick a class from the loaded manifests and stamp it. */
+  pickClass(file: TFile): void {
+    const names = Object.keys(this.loader.manifests).sort();
+    if (names.length === 0) return;
+    new ValueSuggestModal(this.app, names, "Class…", (name) =>
+      void this.setField(file, "class", name)
+    ).open();
+  }
+
+  /** Insert every missing manifest field that declares a default. */
+  async applyClassDefaults(file: TFile): Promise<void> {
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const classValue = fm?.["class"];
+    const className = Array.isArray(classValue) ? classValue[0] : classValue;
+    if (typeof className !== "string") return;
+    const manifest = this.loader.manifests[className];
+    if (!manifest) return;
+    await this.app.fileManager.processFrontMatter(file, (out) => {
+      for (const [name, spec] of Object.entries(manifest.fields ?? {})) {
+        if (spec.default === undefined) continue;
+        const current = out[name];
+        const missing =
+          current == null ||
+          current === "" ||
+          (typeof current === "string" && current.trim() === "") ||
+          (Array.isArray(current) && current.length === 0);
+        if (missing) out[name] = resolveTokens(spec.default);
+      }
+    });
+  }
+
   /** The schema's FieldSpec for a field on this file: class manifest first, then base. */
   private fieldSpecFor(file: TFile, field: string): FieldSpec | null {
     const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -436,7 +552,7 @@ export default class VaultWardenPlugin extends Plugin {
         if (fm["class"] != null && fm["class"] !== "") return;
         fm["class"] = stampClass;
         for (const [key, value] of Object.entries(stamp)) {
-          if (fm[key] == null || fm[key] === "") fm[key] = value;
+          if (fm[key] == null || fm[key] === "") fm[key] = resolveTokens(value);
         }
       });
     }, 800);

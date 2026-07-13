@@ -26,6 +26,7 @@ interface FixtureCase {
   class_locations?: ValidationInput["class_locations"];
   exceptions?: ValidationInput["exceptions"];
   file: ValidationInput["file"];
+  today?: ValidationInput["today"];
   expect: Loose[];
 }
 
@@ -65,6 +66,7 @@ for (const fixtureFile of fixtureFiles) {
           class_locations: testCase.class_locations ?? [],
           exceptions: testCase.exceptions ?? [],
           file: testCase.file,
+          today: testCase.today ?? null,
         };
 
         const actual = validate(input) as unknown as Loose[];

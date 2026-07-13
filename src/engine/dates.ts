@@ -27,6 +27,26 @@ export function isIsoDateValue(value: unknown): boolean {
   return false;
 }
 
+/**
+ * Port of `parse_date_value`: best-effort date extraction for staleness
+ * comparisons. Accepts a JS Date or an ISO date/datetime string; returns the
+ * DATE part as UTC-midnight epoch millis, or null for anything unusable
+ * (staleness rules quietly skip when they can't parse a comparable date).
+ */
+export function parseDateValueMs(value: unknown): number | null {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!ISO_DATE_RE.test(text)) return null;
+  const year = Number(text.slice(0, 4));
+  const month = Number(text.slice(5, 7));
+  const day = Number(text.slice(8, 10));
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return Date.UTC(year, month - 1, day);
+}
+
 /** Deterministic fix for the "space instead of T" shape; null when inapplicable. */
 export function suggestIsoFix(value: unknown): string | null {
   if (typeof value !== "string") return null;

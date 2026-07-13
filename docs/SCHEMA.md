@@ -77,11 +77,22 @@ fields:
   superseded_by:
     type: wikilink
     required_when: {field: status, equals: Superseded}
-lifecycle:                     # parsed; used by batch staleness rules only
+  origin:
+    type: text
+    default: manual            # used by "apply class defaults" / field editor
+  created:
+    type: datetime
+    default: "{{now}}"         # tokens: {{today}} -> YYYY-MM-DD, {{now}} -> ISO datetime
+lifecycle:                     # drives STATUS-STALE
   - date_field: publish_date
     when_status: [Draft]
     suggest: Published
+    # age_days: 90             # optional: stale only when MORE than N days past
 ```
+
+`default:` is plugin-side (batch validators ignore it): the field editor's
+"apply class defaults" inserts defaults for missing fields. The same
+`{{today}}`/`{{now}}` tokens work in the base schema's `creation_stamp` values.
 
 ### Field type grammar
 
@@ -135,13 +146,14 @@ violations **suppressed-but-reported**; without it the note is fully skipped.
 | `CLASS-FIELD-VALUE` | select/multi value not in the closed value set |
 | `CLASS-EXPECTED` † | no class, under a mapped prefix (mechanical: set the mapped class) |
 | `CLASS-MISFILED` | classed note living outside every prefix mapped to its class |
+| `STATUS-STALE` † | a `lifecycle` entry's date has passed (or is older than `age_days`) while `status` is still in `when_status` — suggests the next status. Engines only run it when the caller injects today's date (`today`, YYYY-MM-DD), keeping validation deterministic |
 
 † = can be mechanical (violation carries a concrete `suggested_fix`).
 
-Batch-only rules (`FILENAME-COLLISION`, `LINK-BROKEN`, `STATUS-STALE`, `INBOX-STALE`,
+Batch-only rules (`FILENAME-COLLISION`, `LINK-BROKEN`, `INBOX-STALE`,
 `AREA-FOLDER-MISMATCH`, `BODY-TAG`, `TAG-SPARSE`, `TAG-TWIN`, `FM-PARSE`, …) are
-deliberately not implemented in the plugin — they need whole-vault context, a clock,
-or human judgement.
+deliberately not implemented in the plugin — they need whole-vault context or human
+judgement.
 
 ### Semantics shared by all rules
 

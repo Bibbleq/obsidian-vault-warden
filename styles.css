@@ -99,6 +99,79 @@
   margin-top: var(--size-4-3);
 }
 
+.vault-warden-section-title {
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: var(--size-4-3) 0 var(--size-2-3) 0;
+}
+
+.vault-warden-prop-row {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: baseline;
+  padding: var(--size-2-1) 0;
+  font-size: var(--font-ui-small);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.vault-warden-prop-name {
+  flex: 0 0 32%;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.vault-warden-prop-required-missing {
+  color: var(--text-error);
+  font-weight: var(--font-semibold);
+}
+
+.vault-warden-prop-value {
+  flex: 1;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2-1);
+}
+
+.vault-warden-prop-empty {
+  color: var(--text-faint);
+}
+
+.vault-warden-prop-divider {
+  margin: var(--size-2-3) 0;
+}
+
+.vault-warden-chip {
+  background: var(--background-secondary);
+  border-radius: var(--radius-s);
+  padding: 0 var(--size-2-2);
+  display: inline-flex;
+  gap: var(--size-2-1);
+  align-items: center;
+}
+
+.vault-warden-chip-x {
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.vault-warden-chip-x:hover {
+  color: var(--text-error);
+}
+
+.vault-warden-chip-add {
+  cursor: pointer;
+  color: var(--text-accent);
+}
+
+.vault-warden-suggest-path {
+  color: var(--text-faint);
+}
+
 .vault-warden-suppressed,
 .vault-warden-load-errors {
   margin-top: var(--size-4-3);

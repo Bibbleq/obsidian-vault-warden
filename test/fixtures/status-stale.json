@@ -1,0 +1,395 @@
+[
+  {
+    "name": "date passed and status in when_status fires status-stale",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "2026-01-01",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": [
+      {
+        "rule": "STATUS-STALE",
+        "field": "status",
+        "found": "Accepted",
+        "expected": "Delivered",
+        "mechanical": true,
+        "suggested_fix": { "op": "set_field", "field": "status", "value": "Delivered" }
+      }
+    ]
+  },
+  {
+    "name": "date exactly today fires status-stale",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Ready",
+        "session_date": "2026-07-13",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": [
+      { "rule": "STATUS-STALE", "field": "status", "found": "Ready", "expected": "Delivered" }
+    ]
+  },
+  {
+    "name": "date in the future is clean",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "2026-08-01",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "status not in when_status is clean",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Draft",
+        "session_date": "2026-01-01",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "empty status is clean",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "",
+        "session_date": "2026-01-01",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "empty date field is clean",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "unparseable date string quietly skips",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "not-a-date",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "age_days 90 with date 91 days before fires status-stale",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "Decision": {
+        "name": "Decision",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "decided_date", "when_status": ["Revisited"], "suggest": "Reconsider", "age_days": 90 }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Decision",
+        "status": "Revisited",
+        "decided_date": "2026-04-13",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": [
+      { "rule": "STATUS-STALE", "field": "status", "found": "Revisited", "expected": "Reconsider" }
+    ]
+  },
+  {
+    "name": "age_days 90 with date 30 days before is clean",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "Decision": {
+        "name": "Decision",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "decided_date", "when_status": ["Revisited"], "suggest": "Reconsider", "age_days": 90 }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Decision",
+        "status": "Revisited",
+        "decided_date": "2026-06-13",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "two lifecycle entries where only the second matches fires one violation with the second's suggest",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "Conference": {
+        "name": "Conference",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "a_date", "when_status": ["StatusA"], "suggest": "SuggestA" },
+          { "date_field": "b_date", "when_status": ["StatusB"], "suggest": "SuggestB" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "Conference",
+        "status": "StatusB",
+        "a_date": "2026-01-01",
+        "b_date": "2026-01-01",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": [
+      { "rule": "STATUS-STALE", "field": "status", "found": "StatusB", "expected": "SuggestB" }
+    ]
+  },
+  {
+    "name": "no today in the case at all is clean because the rule needs the clock",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "2026-01-01",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": []
+  },
+  {
+    "name": "datetime string value compares the date part and fires when past",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "2026-01-05T09:30",
+        "created": "2026-07-01"
+      }
+    },
+    "expect": [
+      { "rule": "STATUS-STALE", "field": "status", "found": "Accepted", "expected": "Delivered" }
+    ]
+  },
+  {
+    "name": "validator_ignore suppresses status-stale but the violation is still reported",
+    "base": {
+      "version": 2, "fields": {}, "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [], "presence_only": []
+    },
+    "manifests": {
+      "SpeakingSession": {
+        "name": "SpeakingSession",
+        "version": 1,
+        "fields": {},
+        "lifecycle": [
+          { "date_field": "session_date", "when_status": ["Accepted", "Ready"], "suggest": "Delivered" }
+        ]
+      }
+    },
+    "today": "2026-07-13",
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "class": "SpeakingSession",
+        "status": "Accepted",
+        "session_date": "2026-01-01",
+        "created": "2026-07-01",
+        "validator_ignore": ["STATUS-STALE"]
+      }
+    },
+    "expect": [
+      {
+        "rule": "STATUS-STALE",
+        "field": "status",
+        "found": "Accepted",
+        "expected": "Delivered",
+        "mechanical": true,
+        "suggested_fix": { "op": "set_field", "field": "status", "value": "Delivered" },
+        "suppressed": true
+      }
+    ]
+  }
+]

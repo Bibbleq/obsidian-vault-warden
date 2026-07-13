@@ -1,6 +1,13 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
-import type { Violation } from "./engine/types";
+import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
+import type { FieldSpec, Violation } from "./engine/types";
 import type VaultWardenPlugin from "./main";
+
+function isEmptyValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+}
 
 export const VIEW_TYPE_WARDEN = "vault-warden-violations";
 
@@ -55,6 +62,10 @@ export class WardenView extends ItemView {
 
     container.createEl("div", { text: file.basename, cls: "vault-warden-note-name" });
 
+    this.renderProperties(container, file);
+
+    container.createEl("div", { text: "Violations", cls: "vault-warden-section-title" });
+
     const active = this.plugin.violations.filter((v) => !v.suppressed);
     const suppressed = this.plugin.violations.filter((v) => v.suppressed);
     const mechanical = active.filter((v) => v.mechanical && v.suggested_fix);
@@ -91,6 +102,98 @@ export class WardenView extends ItemView {
     }
 
     this.renderLoadErrors(container);
+  }
+
+  /** Class-aware properties editor: base fields + the class manifest's fields. */
+  private renderProperties(container: HTMLElement, file: TFile): void {
+    const loader = this.plugin.loader;
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    const section = container.createEl("div", { cls: "vault-warden-props" });
+    section.createEl("div", { text: "Properties", cls: "vault-warden-section-title" });
+
+    // Class row.
+    const rawClass = fm["class"];
+    const className = Array.isArray(rawClass) ? rawClass[0] : rawClass;
+    const classRow = section.createEl("div", { cls: "vault-warden-prop-row" });
+    classRow.createEl("span", { text: "class", cls: "vault-warden-prop-name" });
+    const classValue = classRow.createEl("span", {
+      text: typeof className === "string" && className !== "" ? className : "Set class…",
+      cls:
+        typeof className === "string" && className !== ""
+          ? "vault-warden-prop-value"
+          : "vault-warden-prop-value vault-warden-prop-empty",
+    });
+    classValue.addEventListener("click", () => this.plugin.pickClass(file));
+
+    // Base fields, then the class manifest's fields.
+    for (const [name, spec] of Object.entries(loader.base?.fields ?? {})) {
+      this.renderPropRow(section, file, fm, name, spec);
+    }
+
+    const manifest =
+      typeof className === "string" ? loader.manifests[className] : undefined;
+    if (manifest) {
+      const fields = Object.entries(manifest.fields ?? {});
+      if (fields.length > 0) section.createEl("div", { cls: "vault-warden-prop-divider" });
+      for (const [name, spec] of fields) {
+        this.renderPropRow(section, file, fm, name, spec);
+      }
+
+      const hasMissingDefaults = fields.some(
+        ([name, spec]) => spec.default !== undefined && isEmptyValue(fm[name])
+      );
+      if (hasMissingDefaults) {
+        const bar = section.createEl("div", { cls: "vault-warden-toolbar" });
+        const btn = bar.createEl("button", { text: "Apply class defaults" });
+        btn.addEventListener("click", () => void this.plugin.applyClassDefaults(file));
+      }
+    }
+  }
+
+  private renderPropRow(
+    parent: HTMLElement,
+    file: TFile,
+    fm: Record<string, unknown>,
+    name: string,
+    spec: FieldSpec
+  ): void {
+    const value = fm[name];
+    const missing = isEmptyValue(value);
+    const row = parent.createEl("div", { cls: "vault-warden-prop-row" });
+    row.createEl("span", {
+      text: name,
+      cls:
+        spec.required && missing
+          ? "vault-warden-prop-name vault-warden-prop-required-missing"
+          : "vault-warden-prop-name",
+      attr: spec.required ? { "aria-label": "required" } : {},
+    });
+
+    const valueEl = row.createEl("span", { cls: "vault-warden-prop-value" });
+    const isList = spec.type === "multi" || spec.type === "list";
+
+    if (isList && Array.isArray(value) && value.length > 0) {
+      for (const item of value) {
+        const chip = valueEl.createEl("span", { cls: "vault-warden-chip" });
+        chip.createEl("span", { text: String(item) });
+        const removeEl = chip.createEl("span", { text: "×", cls: "vault-warden-chip-x" });
+        removeEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void this.plugin.removeFromListField(file, name, item);
+        });
+      }
+      const add = valueEl.createEl("span", { text: "+", cls: "vault-warden-chip vault-warden-chip-add" });
+      add.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.plugin.editField(file, name, spec);
+      });
+    } else if (missing) {
+      valueEl.createEl("span", { text: "—", cls: "vault-warden-prop-empty" });
+      valueEl.addEventListener("click", () => this.plugin.editField(file, name, spec));
+    } else {
+      valueEl.createEl("span", { text: Array.isArray(value) ? value.map(String).join(", ") : String(value) });
+      valueEl.addEventListener("click", () => this.plugin.editField(file, name, spec));
+    }
   }
 
   private renderViolation(parent: HTMLElement, violation: Violation, fixable = false): void {

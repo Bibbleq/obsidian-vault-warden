@@ -36,6 +36,7 @@ const FIXABLE_RULES: { id: string; desc: string }[] = [
   { id: "TAG-DUPLICATE", desc: "De-duplicate the tags list" },
   { id: "DATE-FORMAT", desc: "Convert space-separated datetimes to ISO (T) form" },
   { id: "CLASS-EXPECTED", desc: "Stamp the class mapped to the note's folder" },
+  { id: "STATUS-STALE", desc: "Advance status when a lifecycle date has passed" },
   { id: "H1-MISSING", desc: "Insert an H1 from the filename" },
   { id: "H1-WHITESPACE", desc: "Trim cosmetic whitespace in the H1" },
   { id: "H1-DEGENERATE", desc: "Restore an empty/punctuation-only H1 from the filename" },

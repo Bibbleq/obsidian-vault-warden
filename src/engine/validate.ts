@@ -23,7 +23,7 @@ import type {
   ValidationInput,
   Violation,
 } from "./types";
-import { dateFieldsToCheck, isIsoDateValue, suggestIsoFix } from "./dates";
+import { dateFieldsToCheck, isIsoDateValue, parseDateValueMs, suggestIsoFix } from "./dates";
 import {
   asList,
   classForPath,
@@ -468,6 +468,53 @@ function checkClassLocation(
   ];
 }
 
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Port of `_check_status_stale`: a lifecycle rule's date field has passed (or
+ * is more than age_days old) while status is still in when_status — suggest
+ * the next status. Only runs when the caller injects `today` (YYYY-MM-DD).
+ */
+function checkStatusStale(
+  frontmatter: Frontmatter,
+  manifest: Manifest | undefined,
+  today: string | null | undefined
+): Violation[] {
+  if (!manifest || !today || !manifest.lifecycle || manifest.lifecycle.length === 0) return [];
+  const todayMs = parseDateValueMs(today);
+  if (todayMs === null) return [];
+  const status = fmGet(frontmatter, "status");
+  if (isEmpty(status)) return [];
+  const statusStr = String(status);
+
+  const violations: Violation[] = [];
+  for (const rule of manifest.lifecycle) {
+    if (!rule.when_status.includes(statusStr)) continue;
+    const dateValue = fmGet(frontmatter, rule.date_field);
+    if (isEmpty(dateValue)) continue;
+    const parsedMs = parseDateValueMs(dateValue);
+    if (parsedMs === null) continue;
+    if (rule.age_days !== null && rule.age_days !== undefined) {
+      // Age semantics: the date is expected to be in the past; stale means
+      // it's been MORE than age_days ago (transient states).
+      if (Math.round((todayMs - parsedMs) / MS_PER_DAY) <= rule.age_days) continue;
+    } else if (parsedMs > todayMs) {
+      continue;
+    }
+    violations.push(
+      violation({
+        rule: "STATUS-STALE",
+        field: "status",
+        found: statusStr,
+        expected: rule.suggest,
+        mechanical: true,
+        suggested_fix: { op: "set_field", field: "status", value: rule.suggest },
+      })
+    );
+  }
+  return violations;
+}
+
 /** Port of `_apply_suppressions`: `validator_ignore` frontmatter marks matching violations suppressed. */
 function applyIgnoreSuppression(frontmatter: Frontmatter, violations: Violation[]): void {
   const ignored = new Set(asList(fmGet(frontmatter, "validator_ignore")).map((r) => String(r).trim().toUpperCase()));
@@ -544,6 +591,7 @@ export const validate: Validate = (input: ValidationInput): Violation[] => {
     violations.push(...checkTimestamps(frontmatter));
     violations.push(...checkClass(frontmatter, manifests));
     violations.push(...checkClassLocation(path, frontmatter, classLocations));
+    violations.push(...checkStatusStale(frontmatter, manifest, input?.today));
 
     applyIgnoreSuppression(frontmatter, violations);
     for (const v of violations) {

@@ -1,4 +1,32 @@
-import { App, Modal, Setting, SuggestModal } from "obsidian";
+import { App, Modal, Setting, SuggestModal, TFile } from "obsidian";
+
+/** Pick a note from the vault; resolves to "[[basename]]" link text. */
+export class FileLinkSuggestModal extends SuggestModal<TFile> {
+  private onPick: (linkText: string) => void;
+
+  constructor(app: App, onPick: (linkText: string) => void) {
+    super(app);
+    this.onPick = onPick;
+    this.setPlaceholder("Link to note…");
+  }
+
+  getSuggestions(query: string): TFile[] {
+    const q = query.toLowerCase();
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => f.path.toLowerCase().includes(q))
+      .slice(0, 50);
+  }
+
+  renderSuggestion(file: TFile, el: HTMLElement): void {
+    el.setText(file.basename);
+    el.createEl("small", { text: ` ${file.path}`, cls: "vault-warden-suggest-path" });
+  }
+
+  onChooseSuggestion(file: TFile): void {
+    this.onPick(`[[${file.basename}]]`);
+  }
+}
 
 /** Pick one value from a closed list (select/multi-backed fields). */
 export class ValueSuggestModal extends SuggestModal<string> {

@@ -295,6 +295,7 @@ export class SchemaLoader {
       required_when: requiredWhen,
       values,
       source,
+      default: spec["default"],
     };
   }
 

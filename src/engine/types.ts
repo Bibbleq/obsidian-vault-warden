@@ -32,6 +32,7 @@ export const RULE_IDS = [
   "CLASS-FIELD-VALUE",
   "CLASS-EXPECTED",
   "CLASS-MISFILED",
+  "STATUS-STALE",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -95,6 +96,12 @@ export interface FieldSpec {
   values?: string[] | null;
   /** Metadata Sources note the values came from (informational). */
   source?: string | null;
+  /**
+   * Default value for "apply class defaults" / field-editor insertion
+   * (plugin-side; batch validators ignore it). Strings support the
+   * {{today}} and {{now}} tokens.
+   */
+  default?: unknown;
 }
 
 export interface TagRules {
@@ -164,6 +171,12 @@ export interface ValidationInput {
     /** Parsed frontmatter as plain data; null when the note has none. */
     frontmatter: Record<string, unknown> | null;
   };
+  /**
+   * Today's date (YYYY-MM-DD) for staleness rules. Omitted/null = those
+   * rules never fire (keeps the engine deterministic; callers inject the
+   * clock).
+   */
+  today?: string | null;
 }
 
 /**
