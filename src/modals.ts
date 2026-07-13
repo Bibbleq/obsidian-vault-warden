@@ -26,6 +26,63 @@ export class ValueSuggestModal extends SuggestModal<string> {
   }
 }
 
+/**
+ * Date/datetime prompt for date-typed fields. Defaults to now; offers the
+ * value with time (YYYY-MM-DDTHH:mm) or as a plain date (YYYY-MM-DD).
+ */
+export class DatePromptModal extends Modal {
+  private promptTitle: string;
+  private initial: string;
+  private onSubmit: (value: string) => void;
+
+  constructor(app: App, title: string, initial: string | null, onSubmit: (value: string) => void) {
+    super(app);
+    this.promptTitle = title;
+    this.initial = initial ?? DatePromptModal.nowLocal();
+    this.onSubmit = onSubmit;
+  }
+
+  /** Current local time as YYYY-MM-DDTHH:mm (datetime-local input format). */
+  static nowLocal(): string {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` +
+      `T${pad(now.getHours())}:${pad(now.getMinutes())}`
+    );
+  }
+
+  onOpen(): void {
+    this.titleEl.setText(this.promptTitle);
+    const input = this.contentEl.createEl("input", {
+      type: "datetime-local",
+      cls: "vault-warden-date-input",
+    });
+    input.value = this.initial;
+
+    const submit = (dateOnly: boolean) => {
+      if (!input.value) return;
+      this.close();
+      this.onSubmit(dateOnly ? input.value.slice(0, 10) : input.value);
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit(false);
+      }
+    });
+
+    new Setting(this.contentEl)
+      .addButton((btn) => btn.setButtonText("Apply").setCta().onClick(() => submit(false)))
+      .addButton((btn) => btn.setButtonText("Date only").onClick(() => submit(true)));
+    window.setTimeout(() => input.focus(), 0);
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 /** Free-text value prompt, prefilled with the current (offending) value. */
 export class TextPromptModal extends Modal {
   private promptTitle: string;

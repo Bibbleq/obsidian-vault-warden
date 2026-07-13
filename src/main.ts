@@ -5,7 +5,7 @@ import { analyzeTitle } from "./engine/titlesync";
 import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
 import { setFirstH1 } from "./body";
 import { SchemaLoader } from "./loader";
-import { TextPromptModal, ValueSuggestModal } from "./modals";
+import { DatePromptModal, TextPromptModal, ValueSuggestModal } from "./modals";
 import {
   DEFAULT_SETTINGS,
   VaultWardenSettings,
@@ -291,14 +291,30 @@ export default class VaultWardenPlugin extends Plugin {
     const allowed = this.allowedValuesFor(file, field);
     if (allowed && allowed.length > 0) {
       new ValueSuggestModal(this.app, allowed, `Value for ${field}…`, apply).open();
-    } else {
-      new TextPromptModal(
-        this.app,
-        `Set ${field}`,
-        violationToFix.found ?? "",
-        apply
-      ).open();
+      return;
     }
+
+    // Date-typed fields get a picker defaulting to now (e.g. CREATED-MISSING).
+    const spec = this.fieldSpecFor(file, field);
+    const isDateField =
+      violationToFix.rule === "CREATED-MISSING" ||
+      violationToFix.rule === "DATE-FORMAT" ||
+      spec?.type === "date" ||
+      spec?.type === "datetime";
+    if (isDateField) {
+      // Prefill from a parseable offending value; otherwise now.
+      const found = (violationToFix.found ?? "").trim();
+      let initial: string | null = null;
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(found)) {
+        initial = found.slice(0, 16).replace(" ", "T");
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(found)) {
+        initial = `${found}T00:00`;
+      }
+      new DatePromptModal(this.app, `Set ${field}`, initial, apply).open();
+      return;
+    }
+
+    new TextPromptModal(this.app, `Set ${field}`, violationToFix.found ?? "", apply).open();
   }
 
   private async applyManualValue(violationToFix: Violation, raw: string): Promise<void> {
