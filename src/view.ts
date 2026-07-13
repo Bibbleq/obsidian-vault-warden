@@ -9,6 +9,23 @@ function isEmptyValue(value: unknown): boolean {
   return false;
 }
 
+/**
+ * Whether the field is required for THIS note, mirroring the engine's
+ * semantics: `required_unless` waives the requirement when the named field is
+ * present; `required_when` imposes it only when another field matches.
+ */
+function isEffectivelyRequired(spec: FieldSpec, fm: Record<string, unknown>): boolean {
+  if (spec.required) {
+    if (spec.required_unless && !isEmptyValue(fm[spec.required_unless])) return false;
+    return true;
+  }
+  if (spec.required_when) {
+    const actual = fm[spec.required_when.field];
+    return !isEmptyValue(actual) && String(actual) === spec.required_when.equals;
+  }
+  return false;
+}
+
 export const VIEW_TYPE_WARDEN = "vault-warden-violations";
 
 /** Right-sidebar violations panel for the active note. */
@@ -159,14 +176,15 @@ export class WardenView extends ItemView {
   ): void {
     const value = fm[name];
     const missing = isEmptyValue(value);
+    const requiredHere = isEffectivelyRequired(spec, fm);
     const row = parent.createEl("div", { cls: "vault-warden-prop-row" });
     row.createEl("span", {
       text: name,
       cls:
-        spec.required && missing
+        requiredHere && missing
           ? "vault-warden-prop-name vault-warden-prop-required-missing"
           : "vault-warden-prop-name",
-      attr: spec.required ? { "aria-label": "required" } : {},
+      attr: requiredHere ? { "aria-label": "required" } : {},
     });
 
     const valueEl = row.createEl("span", { cls: "vault-warden-prop-value" });
