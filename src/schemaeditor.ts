@@ -56,22 +56,46 @@ function chips(
   });
 }
 
-/** Render the full schema editor into the settings tab. */
-export function renderSchemaEditor(
+/** Manual/Automatic dropdown for one fix-capable rule, inline with its config. */
+function fixModeDropdown(
+  container: HTMLElement,
+  plugin: VaultWardenPlugin,
+  ruleId: string,
+  desc: string
+): void {
+  new Setting(container)
+    .setName(ruleId)
+    .setDesc(desc)
+    .setClass("vault-warden-fix-row")
+    .addDropdown((dd) =>
+      dd
+        .addOption("manual", "Manual")
+        .addOption("auto", "Automatic")
+        .setValue(plugin.settings.autoFix[ruleId] ? "auto" : "manual")
+        .onChange(async (value) => {
+          plugin.settings.autoFix[ruleId] = value === "auto";
+          await plugin.saveSettings();
+          await plugin.validateActiveFile();
+        })
+    );
+}
+
+function sectionCard(container: HTMLElement, title: string): HTMLElement {
+  const card = container.createDiv({ cls: "vault-warden-card" });
+  card.createEl("div", { text: title, cls: "vault-warden-card-title" });
+  return card;
+}
+
+// --------------------------------------------------------------------------
+// Rules tab: tags, dates, base fields — detection config + fix mode together.
+// --------------------------------------------------------------------------
+
+export function renderRulesTab(
   container: HTMLElement,
   plugin: VaultWardenPlugin,
   refresh: () => void
 ): void {
   const loader = plugin.loader;
-  container.createEl("h3", { text: "Schema editor" });
-  container.createEl("p", {
-    cls: "vault-warden-rules-note",
-    text:
-      "Edits write straight into the schema YAML files, preserving your comments " +
-      "and formatting. Text boxes save ~1s after you stop typing; everything is " +
-      "also still hand-editable in the files themselves.",
-  });
-
   const basePath = loader.baseFilePath;
   const base = loader.base;
   if (!basePath || !base) {
@@ -80,10 +104,9 @@ export function renderSchemaEditor(
   }
   const editBase = (t: (s: string) => string) => plugin.editSchemaFile(basePath, t);
 
-  // ---- Tags ----------------------------------------------------------------
-  new Setting(container).setName("Tags").setHeading();
+  const tags = sectionCard(container, "Tags");
   debouncedText(
-    new Setting(container).setName("Max depth").setDesc("TAG-DEPTH: maximum / levels per tag."),
+    new Setting(tags).setName("Max depth").setDesc("Maximum / levels per tag."),
     String(base.tags.max_depth),
     "2",
     (v) => {
@@ -92,9 +115,9 @@ export function renderSchemaEditor(
     }
   );
   chips(
-    container,
+    tags,
     "Retired tags",
-    "TAG-RETIRED: removed on sight (case-insensitive).",
+    "Removed on sight (case-insensitive).",
     base.tags.retired,
     async (tag) => {
       await editBase((s) => appendToSeq(s, ["tags", "retired"], tag));
@@ -105,13 +128,16 @@ export function renderSchemaEditor(
       refresh();
     }
   );
+  fixModeDropdown(tags, plugin, "TAG-FORMAT", "Split comma-joined tags; re-case malformed tags");
+  fixModeDropdown(tags, plugin, "TAG-CASE", "Re-case miscased tags (PascalCase)");
+  fixModeDropdown(tags, plugin, "TAG-RETIRED", "Remove retired tags");
+  fixModeDropdown(tags, plugin, "TAG-DUPLICATE", "De-duplicate the tags list");
 
-  // ---- Dates ---------------------------------------------------------------
-  new Setting(container).setName("Dates").setHeading();
+  const dates = sectionCard(container, "Dates");
   chips(
-    container,
+    dates,
     "Date-named suffixes",
-    "DATE-FORMAT applies to any field ending with these, classed or not.",
+    "ISO checking applies to any field ending with these, classed or not.",
     base.date_name_suffixes,
     async (v) => {
       await editBase((s) => appendToSeq(s, ["dates", "name_suffixes"], v));
@@ -123,7 +149,7 @@ export function renderSchemaEditor(
     }
   );
   chips(
-    container,
+    dates,
     "Presence-only fields",
     "Never format-checked (e.g. created).",
     base.presence_only,
@@ -136,12 +162,16 @@ export function renderSchemaEditor(
       refresh();
     }
   );
+  fixModeDropdown(dates, plugin, "DATE-FORMAT", "Convert space-separated datetimes to ISO (T) form");
 
-  // ---- Base fields -----------------------------------------------------------
-  new Setting(container).setName("Base fields").setHeading();
+  const fields = sectionCard(container, "Base fields");
+  fields.createEl("p", {
+    cls: "vault-warden-rules-note",
+    text: "Checked on every note. Type examples: select:Areas, multi:Note Types.",
+  });
   for (const name of ["area", "notetype", "origin"]) {
     const spec = base.fields[name];
-    const row = new Setting(container).setName(name);
+    const row = new Setting(fields).setName(name);
     if (!spec) {
       row.setDesc("Not configured — its FM-* rules are inactive.").addButton((btn) =>
         btn.setButtonText("Add").onClick(async () => {
@@ -151,7 +181,7 @@ export function renderSchemaEditor(
       );
       continue;
     }
-    row.setDesc("Type (e.g. select:Areas, multi:Note Types) · optional-when field · remove");
+    row.setDesc("Type · optional-when field · remove");
     debouncedText(row, rawType(spec), "type", (v) => {
       if (v.trim() !== "") void editBase((s) => setPath(s, ["fields", name, "type"], v.trim()));
     });
@@ -169,132 +199,31 @@ export function renderSchemaEditor(
       })
     );
   }
+  fixModeDropdown(fields, plugin, "FM-AREA-MISSING", "Derive the area from the note's folder path");
+}
 
-  // ---- Creation stamp --------------------------------------------------------
-  new Setting(container).setName("Creation stamp").setHeading();
-  container.createEl("p", {
-    cls: "vault-warden-rules-note",
-    text: "Extra frontmatter stamped on new notes in mapped folders. Values may use {{today}} / {{now}}.",
-  });
-  for (const [key, value] of Object.entries(loader.creationStamp)) {
-    const row = new Setting(container).setName(key);
-    debouncedText(row, value, "value", (v) => {
-      void editBase((s) => setPath(s, ["creation_stamp", key], v));
-    });
-    row.addExtraButton((btn) =>
-      btn.setIcon("trash").onClick(async () => {
-        await editBase((s) => deletePath(s, ["creation_stamp", key]));
-        refresh();
-      })
-    );
+// --------------------------------------------------------------------------
+// Classes tab: class editors, folder map, creation stamp.
+// --------------------------------------------------------------------------
+
+export function renderClassesTab(
+  container: HTMLElement,
+  plugin: VaultWardenPlugin,
+  refresh: () => void
+): void {
+  const loader = plugin.loader;
+  const basePath = loader.baseFilePath;
+  if (!basePath || !loader.base) {
+    container.createEl("p", { text: "No schema loaded — nothing to edit yet." });
+    return;
   }
-  new Setting(container).addButton((btn) =>
-    btn.setButtonText("Add stamp key").onClick(() => {
-      new TextPromptModal(plugin.app, "Frontmatter key", "", (key) => {
-        if (key.trim() === "") return;
-        void editBase((s) => setPath(s, ["creation_stamp", key.trim()], "value")).then(refresh);
-      }).open();
-    })
-  );
+  const editBase = (t: (s: string) => string) => plugin.editSchemaFile(basePath, t);
 
-  // ---- Title sync --------------------------------------------------------------
-  new Setting(container).setName("Title sync").setHeading();
-  const ts = loader.titleSync;
-  if (!ts) {
-    new Setting(container)
-      .setDesc("Filename↔H1 sync is off (no title_sync block).")
-      .addButton((btn) =>
-        btn.setButtonText("Enable title sync").onClick(async () => {
-          await editBase((s) =>
-            setPath(s, ["title_sync"], {
-              strip: '\\/:*?"<>|#^[]',
-              replacement: "",
-              ignore: ["(^|/)[_.]"],
-              frontmatter_title: "",
-              add_old_alias: true,
-            })
-          );
-          refresh();
-        })
-      );
-  } else {
-    debouncedText(
-      new Setting(container).setName("Strip characters").setDesc("Removed when projecting H1 → filename."),
-      ts.strip,
-      "",
-      (v) => void editBase((s) => setPath(s, ["title_sync", "strip"], v))
-    );
-    debouncedText(
-      new Setting(container).setName("Replacement").setDesc("What each stripped character becomes."),
-      ts.replacement,
-      "",
-      (v) => void editBase((s) => setPath(s, ["title_sync", "replacement"], v))
-    );
-    debouncedText(
-      new Setting(container)
-        .setName("Frontmatter title property")
-        .setDesc("Third sync leg; empty = disabled."),
-      ts.frontmatter_title,
-      "",
-      (v) => void editBase((s) => setPath(s, ["title_sync", "frontmatter_title"], v.trim()))
-    );
-    new Setting(container)
-      .setName("Add old filename as alias")
-      .addToggle((toggle) =>
-        toggle.setValue(ts.add_old_alias).onChange((v) => {
-          void editBase((s) => setPath(s, ["title_sync", "add_old_alias"], v));
-        })
-      );
-    chips(
-      container,
-      "Ignore patterns",
-      "Regexes; any match on the path exempts the note.",
-      ts.ignore,
-      async (v) => {
-        await editBase((s) => appendToSeq(s, ["title_sync", "ignore"], v));
-        refresh();
-      },
-      async (v) => {
-        await editBase((s) => removeFromSeq(s, ["title_sync", "ignore"], v));
-        refresh();
-      }
-    );
-    for (const [from, to] of Object.entries(ts.remap)) {
-      const row = new Setting(container).setName(`Remap ${from}`);
-      debouncedText(row, to, "replacement", (v) => {
-        void editBase((s) => setPath(s, ["title_sync", "remap", from], v));
-      });
-      row.addExtraButton((btn) =>
-        btn.setIcon("trash").onClick(async () => {
-          await editBase((s) => deletePath(s, ["title_sync", "remap", from]));
-          refresh();
-        })
-      );
-    }
-    new Setting(container).addButton((btn) =>
-      btn.setButtonText("Add remapping").onClick(() => {
-        new TextPromptModal(plugin.app, "Character(s) to remap", "", (from) => {
-          if (from === "") return;
-          void editBase((s) => setPath(s, ["title_sync", "remap", from], "")).then(refresh);
-        }).open();
-      })
-    );
-  }
-
-  // ---- Folder → class map -------------------------------------------------------
-  new Setting(container).setName("Folder → class map").setHeading();
-  renderLocations(container, plugin, refresh);
-
-  // ---- Exceptions ------------------------------------------------------------------
-  new Setting(container).setName("Exceptions").setHeading();
-  renderExceptions(container, plugin, refresh);
-
-  // ---- Classes ---------------------------------------------------------------------
-  new Setting(container).setName("Classes").setHeading();
+  const classes = sectionCard(container, "Classes");
   for (const name of Object.keys(loader.manifests).sort()) {
     const manifest = loader.manifests[name];
     const count = Object.keys(manifest.fields ?? {}).length;
-    new Setting(container)
+    new Setting(classes)
       .setName(name)
       .setDesc(
         `${count} field${count === 1 ? "" : "s"}` +
@@ -306,7 +235,7 @@ export function renderSchemaEditor(
         })
       );
   }
-  new Setting(container).addButton((btn) =>
+  new Setting(classes).addButton((btn) =>
     btn.setButtonText("New class").onClick(() => {
       new TextPromptModal(plugin.app, "Class name (PascalCase)", "", async (raw) => {
         const name = raw.trim();
@@ -323,6 +252,37 @@ export function renderSchemaEditor(
           `manifest_version: 1\nclass: ${name}\nfields: {}\n`
         );
         refresh();
+      }).open();
+    })
+  );
+  fixModeDropdown(classes, plugin, "STATUS-STALE", "Advance status when a lifecycle date has passed");
+
+  const map = sectionCard(container, "Folder → class map");
+  renderLocations(map, plugin, refresh);
+  fixModeDropdown(map, plugin, "CLASS-EXPECTED", "Stamp the class mapped to the note's folder");
+
+  const stamp = sectionCard(container, "Creation stamp");
+  stamp.createEl("p", {
+    cls: "vault-warden-rules-note",
+    text: "Extra frontmatter stamped on new notes in mapped folders. Values may use {{today}} / {{now}}.",
+  });
+  for (const [key, value] of Object.entries(loader.creationStamp)) {
+    const row = new Setting(stamp).setName(key);
+    debouncedText(row, value, "value", (v) => {
+      void editBase((s) => setPath(s, ["creation_stamp", key], v));
+    });
+    row.addExtraButton((btn) =>
+      btn.setIcon("trash").onClick(async () => {
+        await editBase((s) => deletePath(s, ["creation_stamp", key]));
+        refresh();
+      })
+    );
+  }
+  new Setting(stamp).addButton((btn) =>
+    btn.setButtonText("Add stamp key").onClick(() => {
+      new TextPromptModal(plugin.app, "Frontmatter key", "", (key) => {
+        if (key.trim() === "") return;
+        void editBase((s) => setPath(s, ["creation_stamp", key.trim()], "value")).then(refresh);
       }).open();
     })
   );
@@ -374,11 +334,142 @@ function renderLocations(container: HTMLElement, plugin: VaultWardenPlugin, refr
   );
 }
 
-function renderExceptions(container: HTMLElement, plugin: VaultWardenPlugin, refresh: () => void): void {
+// --------------------------------------------------------------------------
+// Title sync tab.
+// --------------------------------------------------------------------------
+
+export function renderTitleSyncTab(
+  container: HTMLElement,
+  plugin: VaultWardenPlugin,
+  refresh: () => void
+): void {
   const loader = plugin.loader;
+  const basePath = loader.baseFilePath;
+  if (!basePath || !loader.base) {
+    container.createEl("p", { text: "No schema loaded — nothing to edit yet." });
+    return;
+  }
+  const editBase = (t: (s: string) => string) => plugin.editSchemaFile(basePath, t);
+  const ts = loader.titleSync;
+
+  const card = sectionCard(container, "Filename ↔ H1 sync");
+  if (!ts) {
+    new Setting(card)
+      .setDesc("Off (no title_sync block in the vault schema).")
+      .addButton((btn) =>
+        btn.setButtonText("Enable title sync").onClick(async () => {
+          await editBase((s) =>
+            setPath(s, ["title_sync"], {
+              strip: '\\/:*?"<>|#^[]',
+              replacement: "",
+              ignore: ["(^|/)[_.]"],
+              frontmatter_title: "",
+              add_old_alias: true,
+            })
+          );
+          refresh();
+        })
+      );
+    return;
+  }
+
+  debouncedText(
+    new Setting(card).setName("Strip characters").setDesc("Removed when projecting H1 → filename."),
+    ts.strip,
+    "",
+    (v) => void editBase((s) => setPath(s, ["title_sync", "strip"], v))
+  );
+  debouncedText(
+    new Setting(card).setName("Replacement").setDesc("What each stripped character becomes."),
+    ts.replacement,
+    "",
+    (v) => void editBase((s) => setPath(s, ["title_sync", "replacement"], v))
+  );
+  debouncedText(
+    new Setting(card)
+      .setName("Frontmatter title property")
+      .setDesc("Third sync leg; empty = disabled."),
+    ts.frontmatter_title,
+    "",
+    (v) => void editBase((s) => setPath(s, ["title_sync", "frontmatter_title"], v.trim()))
+  );
+  new Setting(card)
+    .setName("Add old filename as alias")
+    .addToggle((toggle) =>
+      toggle.setValue(ts.add_old_alias).onChange((v) => {
+        void editBase((s) => setPath(s, ["title_sync", "add_old_alias"], v));
+      })
+    );
+  chips(
+    card,
+    "Ignore patterns",
+    "Regexes; any match on the path exempts the note.",
+    ts.ignore,
+    async (v) => {
+      await editBase((s) => appendToSeq(s, ["title_sync", "ignore"], v));
+      refresh();
+    },
+    async (v) => {
+      await editBase((s) => removeFromSeq(s, ["title_sync", "ignore"], v));
+      refresh();
+    }
+  );
+
+  const remap = card.createEl("details", { cls: "vault-warden-collapse" });
+  remap.createEl("summary", { text: `Remappings (${Object.keys(ts.remap).length})` });
+  for (const [from, to] of Object.entries(ts.remap)) {
+    const row = new Setting(remap).setName(`${from} →`);
+    debouncedText(row, to, "replacement", (v) => {
+      void editBase((s) => setPath(s, ["title_sync", "remap", from], v));
+    });
+    row.addExtraButton((btn) =>
+      btn.setIcon("trash").onClick(async () => {
+        await editBase((s) => deletePath(s, ["title_sync", "remap", from]));
+        refresh();
+      })
+    );
+  }
+  new Setting(remap).addButton((btn) =>
+    btn.setButtonText("Add remapping").onClick(() => {
+      new TextPromptModal(plugin.app, "Character(s) to remap", "", (from) => {
+        if (from === "") return;
+        void editBase((s) => setPath(s, ["title_sync", "remap", from], "")).then(refresh);
+      }).open();
+    })
+  );
+
+  const fixes = sectionCard(container, "Fix application");
+  fixModeDropdown(fixes, plugin, "H1-MISSING", "Insert an H1 from the filename");
+  fixModeDropdown(fixes, plugin, "H1-WHITESPACE", "Trim cosmetic whitespace in the H1");
+  fixModeDropdown(fixes, plugin, "H1-DEGENERATE", "Restore an empty/punctuation-only H1 from the filename");
+  fixModeDropdown(fixes, plugin, "FILENAME-SYNC", "Rename the file to follow the H1 (backlinks update)");
+  fixModeDropdown(fixes, plugin, "TITLE-PROPERTY", "Keep the configured title property equal to the H1");
+}
+
+// --------------------------------------------------------------------------
+// Exceptions tab.
+// --------------------------------------------------------------------------
+
+export function renderExceptionsTab(
+  container: HTMLElement,
+  plugin: VaultWardenPlugin,
+  refresh: () => void
+): void {
+  const loader = plugin.loader;
+  if (!loader.base) {
+    container.createEl("p", { text: "No schema loaded — nothing to edit yet." });
+    return;
+  }
+  const card = sectionCard(container, "Exceptions");
+  card.createEl("p", {
+    cls: "vault-warden-rules-note",
+    text:
+      "Notes deliberately outside the rules. With rule IDs listed, matching notes get those " +
+      "violations suppressed-but-reported; with none, the note is fully skipped.",
+  });
   const path = loader.exceptionsPath;
   if (!path) {
-    new Setting(container)
+    new Setting(card)
       .setDesc("No exceptions file yet.")
       .addButton((btn) =>
         btn.setButtonText("Create it").onClick(async () => {
@@ -392,7 +483,7 @@ function renderExceptions(container: HTMLElement, plugin: VaultWardenPlugin, ref
 
   loader.exceptions.forEach((entry, i) => {
     const isPattern = entry.pattern != null;
-    const row = new Setting(container)
+    const row = new Setting(card)
       .setName(isPattern ? "pattern" : "path")
       .setDesc(entry.reason ?? "");
     debouncedText(row, entry.path ?? entry.pattern ?? "", "vault path or glob", (v) => {
@@ -415,7 +506,7 @@ function renderExceptions(container: HTMLElement, plugin: VaultWardenPlugin, ref
       })
     );
   });
-  new Setting(container)
+  new Setting(card)
     .addButton((btn) =>
       btn.setButtonText("Add path exception").onClick(async () => {
         await edit((s) => appendToSeq(s, ["exceptions"], { path: "Note.md", reason: "why" }));
@@ -429,6 +520,101 @@ function renderExceptions(container: HTMLElement, plugin: VaultWardenPlugin, ref
       })
     );
 }
+
+// --------------------------------------------------------------------------
+// Active-rules summary (Overview tab, read-only).
+// --------------------------------------------------------------------------
+
+export function renderActiveRules(el: HTMLElement, plugin: VaultWardenPlugin): void {
+  const loader = plugin.loader;
+  const base = loader.base;
+  if (!base) return;
+
+  const table = el.createEl("div", { cls: "vault-warden-rules" });
+  const category = (title: string) =>
+    table.createEl("div", { cls: "vault-warden-rules-category", text: title });
+  const rule = (ids: string, active: boolean, detail: string) => {
+    const row = table.createEl("div", { cls: "vault-warden-rules-row" });
+    row.createEl("code", { text: ids });
+    row.createEl("span", {
+      text: active ? detail : `inactive — ${detail}`,
+      cls: active ? "" : "vault-warden-rule-inactive",
+    });
+  };
+
+  category("Base fields (every note)");
+  for (const name of ["area", "notetype", "origin"]) {
+    const spec = base.fields[name];
+    const upper = name.toUpperCase();
+    if (spec) {
+      const source = spec.source ? ` from ${spec.source}` : "";
+      const unless = spec.required_unless
+        ? `; optional when ${spec.required_unless} is set`
+        : "";
+      rule(
+        `FM-${upper}-MISSING · FM-${upper}-INVALID`,
+        true,
+        `${spec.values?.length ?? 0} allowed value(s)${source}${unless}`
+      );
+    } else {
+      rule(`FM-${upper}-MISSING · FM-${upper}-INVALID`, false, "field not in the vault schema");
+    }
+  }
+
+  category("Tags (every note)");
+  rule("TAG-FORMAT · TAG-CASE", true, "PascalCase alphanumeric segments joined by /");
+  rule("TAG-DEPTH", true, `at most ${base.tags.max_depth} level(s)`);
+  rule(
+    "TAG-RETIRED",
+    base.tags.retired.length > 0,
+    base.tags.retired.length > 0
+      ? `${base.tags.retired.length} retired tag(s)`
+      : "no retired tags listed"
+  );
+  rule("TAG-DUPLICATE", true, "no exact duplicate entries");
+
+  category("Dates");
+  rule(
+    "DATE-FORMAT",
+    true,
+    `ISO check on class date fields and any field ending ${base.date_name_suffixes.join(" / ")}` +
+      (base.presence_only.length > 0 ? `; exempt: ${base.presence_only.join(", ")}` : "")
+  );
+  rule("CREATED-MISSING", true, "created must be present on every note");
+
+  const classCount = Object.keys(loader.manifests).length;
+  category("Classes");
+  rule(
+    "CLASS-UNKNOWN · CLASS-FIELD-MISSING · CLASS-FIELD-TYPE · CLASS-FIELD-VALUE",
+    classCount > 0,
+    classCount > 0 ? `${classCount} class manifest(s)` : "no class manifests loaded"
+  );
+  rule(
+    "STATUS-STALE",
+    Object.values(loader.manifests).some((m) => (m.lifecycle ?? []).length > 0),
+    "lifecycle-driven status suggestions"
+  );
+
+  category("Folder locations");
+  rule(
+    "CLASS-EXPECTED · CLASS-MISFILED",
+    loader.classLocations.length > 0,
+    loader.classLocations.length > 0
+      ? `${loader.classLocations.length} mapped folder prefix(es)`
+      : "no class_locations file"
+  );
+
+  category("Title sync");
+  rule(
+    "H1-MISSING · H1-WHITESPACE · H1-DEGENERATE · FILENAME-SYNC",
+    loader.titleSync !== null,
+    loader.titleSync !== null ? "filename follows H1; cosmetic H1 defects repaired" : "no title_sync block"
+  );
+}
+
+// --------------------------------------------------------------------------
+// Per-class manifest editor modal.
+// --------------------------------------------------------------------------
 
 /** Per-class manifest editor: fields, lifecycle, body template. */
 export class ClassEditorModal extends Modal {

@@ -1,7 +1,7 @@
 {
 	"id": "vault-warden",
 	"name": "Vault Warden",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"minAppVersion": "1.5.0",
 	"description": "Schema-driven, write-time vault hygiene. Validates the active note's frontmatter against YAML rule manifests stored in your vault.",
 	"author": "Ben Lee",

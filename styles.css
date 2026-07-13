@@ -189,6 +189,139 @@
   width: min(720px, 90vw);
 }
 
+.vault-warden-header {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-3);
+  margin-bottom: var(--size-4-3);
+}
+
+.vault-warden-header-top {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-3);
+}
+
+.vault-warden-header-icon {
+  font-size: 1.6em;
+}
+
+.vault-warden-header-title {
+  flex: 1;
+}
+
+.vault-warden-header-version {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-left: var(--size-2-2);
+}
+
+.vault-warden-header-path {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+}
+
+.vault-warden-header-link {
+  font-size: var(--font-ui-small);
+}
+
+.vault-warden-status-chips {
+  display: flex;
+  gap: var(--size-2-2);
+  flex-wrap: wrap;
+  margin-top: var(--size-4-2);
+}
+
+.vault-warden-status-chip {
+  font-size: var(--font-ui-smaller);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  border-radius: var(--radius-l);
+  padding: 1px var(--size-4-2);
+}
+
+.vault-warden-status-chip.is-ok {
+  color: var(--text-success);
+}
+
+.vault-warden-status-chip.is-error {
+  color: var(--text-error);
+}
+
+.vault-warden-tabbar {
+  display: flex;
+  gap: var(--size-2-1);
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: var(--size-4-3);
+  flex-wrap: wrap;
+}
+
+.vault-warden-tab {
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+}
+
+.vault-warden-tab.is-active {
+  color: var(--text-normal);
+  border-bottom-color: var(--interactive-accent);
+  background: var(--background-secondary);
+}
+
+.vault-warden-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3);
+  margin-bottom: var(--size-4-3);
+}
+
+.vault-warden-card-title {
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--size-2-3);
+}
+
+.vault-warden-card .setting-item {
+  border-top: none;
+  padding-top: var(--size-2-3);
+  padding-bottom: var(--size-2-3);
+}
+
+.vault-warden-fix-row .setting-item-name {
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+}
+
+.vault-warden-chip-link {
+  cursor: pointer;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.vault-warden-chip-link:hover {
+  color: var(--text-accent);
+}
+
+.vault-warden-collapse summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  padding: var(--size-2-2) 0;
+}
+
+.vault-warden-overview-rules {
+  margin-top: var(--size-4-3);
+}
+
+.vault-warden-overview-rules > summary {
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+}
+
 .vault-warden-suppressed,
 .vault-warden-load-errors {
   margin-top: var(--size-4-3);
