@@ -115,13 +115,51 @@ function checkBaseFields(path: string, frontmatter: Frontmatter, base: BaseSchem
   return violations;
 }
 
+/**
+ * Port of `_split_tag_entries`: Obsidian's tag index treats a comma-joined
+ * string ("A,B") as multiple tags, so tag rules must see the same tags the
+ * app does. String entries split on commas (trimmed, empties dropped);
+ * non-strings pass through.
+ */
+function splitTagEntries(rawList: unknown[]): { entries: unknown[]; hadComma: boolean } {
+  const entries: unknown[] = [];
+  let hadComma = false;
+  for (const entry of rawList) {
+    if (typeof entry === "string" && entry.includes(",")) {
+      hadComma = true;
+      for (const part of entry.split(",")) {
+        const trimmed = part.trim();
+        if (trimmed !== "") entries.push(trimmed);
+      }
+    } else {
+      entries.push(entry);
+    }
+  }
+  return { entries, hadComma };
+}
+
 /** Port of `_check_tags`: TAG-FORMAT, TAG-CASE, TAG-DEPTH, TAG-RETIRED. */
 function checkTags(frontmatter: Frontmatter, base: BaseSchema): Violation[] {
   const violations: Violation[] = [];
   const rules = base.tags ?? { max_depth: 2, retired: [] };
   const retiredLower = new Set((rules.retired ?? []).map((t) => t.replace(/^#+/, "").toLowerCase()));
 
-  for (const rawTag of asList(fmGet(frontmatter, "tags"))) {
+  const rawList = asList(fmGet(frontmatter, "tags"));
+  const { entries, hadComma } = splitTagEntries(rawList);
+  if (hadComma) {
+    violations.push(
+      violation({
+        rule: "TAG-FORMAT",
+        field: "tags",
+        found: JSON.stringify(rawList),
+        expected: "one tag per entry (split comma-separated tags)",
+        mechanical: true,
+        suggested_fix: { op: "set_list", field: "tags", value: entries },
+      })
+    );
+  }
+
+  for (const rawTag of entries) {
     if (rawTag === null || rawTag === undefined) continue;
     if (typeof rawTag !== "string") {
       violations.push(
@@ -188,7 +226,10 @@ function checkTags(frontmatter: Frontmatter, base: BaseSchema): Violation[] {
 
 /** Port of `_check_tag_duplicates`: one TAG-DUPLICATE violation per note. */
 function checkTagDuplicates(frontmatter: Frontmatter): Violation[] {
-  const tags = asList(fmGet(frontmatter, "tags"));
+  // Duplicates are judged on the comma-normalized entries (the tags Obsidian
+  // sees), so this fix composes with checkTags's comma-split fix rather than
+  // undoing it.
+  const { entries: tags } = splitTagEntries(asList(fmGet(frontmatter, "tags")));
   if (tags.length === 0) return [];
   const seen: unknown[] = [];
   const deduped: unknown[] = [];

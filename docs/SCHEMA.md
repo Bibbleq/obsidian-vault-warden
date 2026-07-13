@@ -149,7 +149,10 @@ or human judgement.
 - **Class resolution**: `class` may be a list; the first entry (stringified) names the
   class. An empty class = unclassed.
 - **Tags**: a bare string tags value counts as a one-entry list; a single leading `#`
-  is stripped before checking.
+  is stripped before checking. Comma-joined string entries (`"A,B"`) are normalized
+  into separate tags before any tag rule runs — matching how Obsidian's own tag index
+  reads them — and additionally raise one mechanical `TAG-FORMAT` violation whose fix
+  rewrites the tags as a proper list. `TAG-DUPLICATE` judges the normalized entries.
 - **Suppression**: rule IDs listed in the note's `validator_ignore` frontmatter
   (string or list, matched case-insensitively) or in a matching rule-scoped
   exception mark those violations `suppressed: true` — reported, not dropped.

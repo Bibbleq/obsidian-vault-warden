@@ -1,5 +1,114 @@
 [
   {
+    "name": "comma-joined list entry splits into clean tags with set_list fix",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": ["Microsoft/Copilot,Microsoft/Governance"],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_list",
+          "field": "tags",
+          "value": ["Microsoft/Copilot", "Microsoft/Governance"]
+        }
+      }
+    ]
+  },
+  {
+    "name": "comma-joined bare string tags value splits",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": "Microsoft/Copilot,Microsoft/Governance",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "TAG-FORMAT",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_list",
+          "field": "tags",
+          "value": ["Microsoft/Copilot", "Microsoft/Governance"]
+        }
+      }
+    ]
+  },
+  {
+    "name": "split comma parts are individually validated",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": ["Alpha,beta"],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      { "rule": "TAG-FORMAT", "field": "tags" },
+      { "rule": "TAG-CASE", "field": "tags", "found": "beta" }
+    ]
+  },
+  {
+    "name": "comma split composes with duplicate detection on normalized entries",
+    "base": {
+      "version": 2,
+      "fields": {},
+      "tags": { "max_depth": 2, "retired": [] },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "tags": ["Alpha/Beta", "Alpha/Beta,Gamma"],
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      { "rule": "TAG-FORMAT", "field": "tags" },
+      {
+        "rule": "TAG-DUPLICATE",
+        "field": "tags",
+        "mechanical": true,
+        "suggested_fix": {
+          "op": "set_list",
+          "field": "tags",
+          "value": ["Alpha/Beta", "Gamma"]
+        }
+      }
+    ]
+  },
+  {
     "name": "spaced tag fails format",
     "base": {
       "version": 2,
