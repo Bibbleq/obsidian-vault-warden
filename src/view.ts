@@ -1,6 +1,9 @@
-import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import type { FieldSpec, Violation } from "./engine/types";
 import type VaultWardenPlugin from "./main";
+
+const WIKILINK_VALUE_RE = /^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]$/;
+const PALETTE = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"];
 
 function isEmptyValue(value: unknown): boolean {
   if (value === null || value === undefined) return true;
@@ -151,9 +154,42 @@ export class WardenView extends ItemView {
       typeof className === "string" ? loader.manifests[className] : undefined;
     if (manifest) {
       const fields = Object.entries(manifest.fields ?? {});
-      if (fields.length > 0) section.createEl("div", { cls: "vault-warden-prop-divider" });
-      for (const [name, spec] of fields) {
-        this.renderPropRow(section, file, fm, name, spec);
+
+      if (manifest.display && manifest.display.length > 0) {
+        const shown = new Set<string>();
+        for (const displaySection of manifest.display) {
+          const head = section.createEl("div", { cls: "vault-warden-prop-section" });
+          if (displaySection.color && PALETTE.includes(displaySection.color)) {
+            head.style.color = `var(--color-${displaySection.color})`;
+          }
+          if (displaySection.icon) {
+            const iconEl = head.createEl("span", { cls: "vault-warden-prop-section-icon" });
+            setIcon(iconEl, displaySection.icon);
+          }
+          head.createEl("span", { text: displaySection.section });
+          for (const entry of displaySection.fields) {
+            shown.add(entry.field);
+            const spec =
+              manifest.fields?.[entry.field] ?? loader.base?.fields?.[entry.field] ?? null;
+            this.renderPropRow(section, file, fm, entry.field, spec, {
+              label: entry.label ?? undefined,
+              icon: entry.icon ?? undefined,
+            });
+          }
+        }
+        const rest = fields.filter(([name]) => !shown.has(name));
+        if (rest.length > 0) {
+          const more = section.createEl("details", { cls: "vault-warden-prop-more" });
+          more.createEl("summary", { text: `More fields (${rest.length})` });
+          for (const [name, spec] of rest) {
+            this.renderPropRow(more, file, fm, name, spec);
+          }
+        }
+      } else {
+        if (fields.length > 0) section.createEl("div", { cls: "vault-warden-prop-divider" });
+        for (const [name, spec] of fields) {
+          this.renderPropRow(section, file, fm, name, spec);
+        }
       }
 
       const hasMissingDefaults = fields.some(
@@ -167,33 +203,58 @@ export class WardenView extends ItemView {
     }
   }
 
+  /** Render a value: wikilinks become clickable internal links. */
+  private renderValueText(parent: HTMLElement, raw: unknown, sourcePath: string): void {
+    const text = String(raw);
+    const match = typeof raw === "string" ? WIKILINK_VALUE_RE.exec(raw.trim()) : null;
+    if (!match) {
+      parent.createEl("span", { text });
+      return;
+    }
+    const target = match[1].trim();
+    const link = parent.createEl("a", {
+      text: match[2]?.trim() || target,
+      cls: "internal-link",
+    });
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void this.app.workspace.openLinkText(target, sourcePath);
+    });
+  }
+
   private renderPropRow(
     parent: HTMLElement,
     file: TFile,
     fm: Record<string, unknown>,
     name: string,
-    spec: FieldSpec
+    spec: FieldSpec | null,
+    opts: { label?: string; icon?: string } = {}
   ): void {
     const value = fm[name];
     const missing = isEmptyValue(value);
-    const requiredHere = isEffectivelyRequired(spec, fm);
+    const requiredHere = spec ? isEffectivelyRequired(spec, fm) : false;
     const row = parent.createEl("div", { cls: "vault-warden-prop-row" });
-    row.createEl("span", {
-      text: name,
+    const nameEl = row.createEl("span", {
       cls:
         requiredHere && missing
           ? "vault-warden-prop-name vault-warden-prop-required-missing"
           : "vault-warden-prop-name",
       attr: requiredHere ? { "aria-label": "required" } : {},
     });
+    if (opts.icon) {
+      const iconEl = nameEl.createEl("span", { cls: "vault-warden-prop-icon" });
+      setIcon(iconEl, opts.icon);
+    }
+    nameEl.createEl("span", { text: opts.label ?? name });
 
     const valueEl = row.createEl("span", { cls: "vault-warden-prop-value" });
-    const isList = spec.type === "multi" || spec.type === "list";
+    const isList = spec?.type === "multi" || spec?.type === "list" || Array.isArray(value);
 
     if (isList && Array.isArray(value) && value.length > 0) {
       for (const item of value) {
         const chip = valueEl.createEl("span", { cls: "vault-warden-chip" });
-        chip.createEl("span", { text: String(item) });
+        this.renderValueText(chip, item, file.path);
         const removeEl = chip.createEl("span", { text: "×", cls: "vault-warden-chip-x" });
         removeEl.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -209,7 +270,7 @@ export class WardenView extends ItemView {
       valueEl.createEl("span", { text: "—", cls: "vault-warden-prop-empty" });
       valueEl.addEventListener("click", () => this.plugin.editField(file, name, spec));
     } else {
-      valueEl.createEl("span", { text: Array.isArray(value) ? value.map(String).join(", ") : String(value) });
+      this.renderValueText(valueEl, value, file.path);
       valueEl.addEventListener("click", () => this.plugin.editField(file, name, spec));
     }
   }

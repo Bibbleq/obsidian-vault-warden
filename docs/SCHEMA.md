@@ -94,6 +94,24 @@ lifecycle:                     # drives STATUS-STALE
 "apply class defaults" inserts defaults for missing fields. The same
 `{{today}}`/`{{now}}` tokens work in the base schema's `creation_stamp` values.
 
+A manifest may also declare a `display:` block (plugin-side) — a declarative
+layout for the plugin's properties pane: sections with a heading, optional
+Lucide `icon:` and Obsidian palette `color:` (red/orange/yellow/green/cyan/
+blue/purple/pink), and per-field `label:`/`icon:` overrides. Purely
+presentational, no logic. Fields not listed collapse into a "More fields"
+group; a display entry may reference any frontmatter key, not just declared
+fields.
+
+```yaml
+display:
+  - section: Content details
+    icon: clapperboard
+    color: purple
+    fields:
+      - {field: content_type, label: Type, icon: film}
+      - {field: status, label: Status}
+```
+
 A manifest may also declare a top-level `body_template:` (plugin-side) — the
 vault-relative path of a markdown file whose **body** scaffolds new notes of
 this class: the template's own frontmatter is discarded (the manifest owns

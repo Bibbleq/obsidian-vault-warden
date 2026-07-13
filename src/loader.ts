@@ -2,6 +2,7 @@ import { App, TFile, TFolder, parseYaml } from "obsidian";
 import type {
   BaseSchema,
   ClassLocation,
+  DisplaySection,
   ExceptionRule,
   FieldSpec,
   FieldType,
@@ -256,7 +257,38 @@ export class SchemaLoader {
         typeof data["body_template"] === "string" && data["body_template"].trim() !== ""
           ? data["body_template"]
           : null,
+      display: this.parseDisplay(data["display"]),
     };
+  }
+
+  private parseDisplay(raw: unknown): DisplaySection[] | null {
+    if (!Array.isArray(raw)) return null;
+    const sections: DisplaySection[] = [];
+    for (const entry of raw) {
+      const rec = asRecord(entry);
+      if (typeof rec["section"] !== "string") continue;
+      const fields = [];
+      for (const f of Array.isArray(rec["fields"]) ? rec["fields"] : []) {
+        if (typeof f === "string") {
+          fields.push({ field: f });
+        } else {
+          const fr = asRecord(f);
+          if (typeof fr["field"] !== "string") continue;
+          fields.push({
+            field: fr["field"],
+            label: typeof fr["label"] === "string" ? fr["label"] : null,
+            icon: typeof fr["icon"] === "string" ? fr["icon"] : null,
+          });
+        }
+      }
+      sections.push({
+        section: rec["section"],
+        icon: typeof rec["icon"] === "string" ? rec["icon"] : null,
+        color: typeof rec["color"] === "string" ? rec["color"] : null,
+        fields,
+      });
+    }
+    return sections.length > 0 ? sections : null;
   }
 
   private parseLifecycle(raw: unknown): LifecycleRule[] {

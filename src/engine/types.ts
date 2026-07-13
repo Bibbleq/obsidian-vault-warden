@@ -129,6 +129,25 @@ export interface LifecycleRule {
   age_days?: number | null;
 }
 
+/** One field entry in a display section (plugin-side pane layout). */
+export interface DisplayField {
+  field: string;
+  /** Friendly label; defaults to the field name. */
+  label?: string | null;
+  /** Lucide icon name for the row. */
+  icon?: string | null;
+}
+
+/** One section of the pane's properties layout for a class (plugin-side). */
+export interface DisplaySection {
+  section: string;
+  /** Lucide icon name for the section heading. */
+  icon?: string | null;
+  /** Obsidian palette name: red/orange/yellow/green/cyan/blue/purple/pink. */
+  color?: string | null;
+  fields: DisplayField[];
+}
+
 /** Parsed class manifest, post-load. */
 export interface Manifest {
   name: string;
@@ -141,6 +160,11 @@ export interface Manifest {
    * Plugin-side; batch validators ignore it.
    */
   body_template?: string | null;
+  /**
+   * Declarative pane layout: sections with labels/icons. Purely presentational
+   * (no logic); fields not listed appear in a collapsed group. Plugin-side.
+   */
+  display?: DisplaySection[] | null;
 }
 
 /** One folder-prefix -> class mapping (class_locations.yaml). */

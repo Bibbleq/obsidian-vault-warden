@@ -145,6 +145,45 @@
   margin: var(--size-2-3) 0;
 }
 
+.vault-warden-prop-section {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  font-weight: var(--font-semibold);
+  margin: var(--size-4-3) 0 var(--size-2-2) 0;
+}
+
+.vault-warden-prop-section-icon svg,
+.vault-warden-prop-icon svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+
+.vault-warden-prop-icon {
+  margin-right: var(--size-2-2);
+  color: var(--text-muted);
+}
+
+.vault-warden-prop-name {
+  display: inline-flex;
+  align-items: center;
+}
+
+.vault-warden-prop-more {
+  margin-top: var(--size-2-3);
+}
+
+.vault-warden-prop-more > summary {
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.vault-warden-prop-value a.internal-link {
+  cursor: pointer;
+}
+
 .vault-warden-chip {
   background: var(--background-secondary);
   border-radius: var(--radius-s);
