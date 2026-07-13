@@ -66,6 +66,10 @@ export default class VaultWardenPlugin extends Plugin {
       this.app.metadataCache.on("changed", (file) => {
         if (file.path === this.app.workspace.getActiveFile()?.path) {
           debouncedValidate();
+        } else if (file instanceof TFile && file.extension === "md") {
+          // The note was edited and then left before its save landed —
+          // still run its automatic fixes.
+          void this.autoFixInBackground(file);
         }
       })
     );
@@ -115,18 +119,10 @@ export default class VaultWardenPlugin extends Plugin {
   /** Guards against auto-fix re-entrancy (fixes trigger change events). */
   private autoFixing = false;
 
-  /** Validate the active markdown file, auto-apply configured fixes, refresh UI. */
-  async validateActiveFile(): Promise<void> {
-    const file = this.app.workspace.getActiveFile();
+  /** All violations (engine + title sync, suppression applied) for one file. */
+  private computeViolations(file: TFile): Violation[] {
     const base = this.loader.base;
-    if (!file || file.extension !== "md" || !base) {
-      this.violations = [];
-      this.validatedFile = null;
-      this.updateBadge(null);
-      this.refreshView();
-      return;
-    }
-    this.validatedFile = file;
+    if (!base) return [];
 
     const cache = this.app.metadataCache.getFileCache(file);
     let frontmatter: Record<string, unknown> | null = null;
@@ -158,22 +154,57 @@ export default class VaultWardenPlugin extends Plugin {
         applySuppressions(frontmatter, file.path, this.loader.exceptions, titleViolations)
       );
     }
+    return all;
+  }
 
+  private autoFixable(violations: Violation[]): Violation[] {
+    return violations.filter(
+      (v) => v.mechanical && !v.suppressed && v.suggested_fix && this.settings.autoFix[v.rule]
+    );
+  }
+
+  /** Validate the active markdown file, auto-apply configured fixes, refresh UI. */
+  async validateActiveFile(): Promise<void> {
+    const file = this.app.workspace.getActiveFile();
+    if (!file || file.extension !== "md" || !this.loader.base) {
+      this.violations = [];
+      this.validatedFile = null;
+      this.updateBadge(null);
+      this.refreshView();
+      return;
+    }
+    this.validatedFile = file;
+    const all = this.computeViolations(file);
     this.violations = all;
     this.updateBadge(all.filter((v) => !v.suppressed).length);
     this.refreshView();
 
-    // Auto-apply fixes for rules the user has set to Automatic.
-    const auto = all.filter(
-      (v) => v.mechanical && !v.suppressed && v.suggested_fix && this.settings.autoFix[v.rule]
-    );
+    const auto = this.autoFixable(all);
     if (auto.length > 0 && !this.autoFixing) {
       this.autoFixing = true;
       try {
-        await this.applyFixes(auto);
+        await this.applyFixesFor(file, auto);
       } finally {
         this.autoFixing = false;
       }
+    }
+  }
+
+  /**
+   * Auto-fix pass for a file that is no longer active — Obsidian saves (and
+   * fires metadataCache 'changed') shortly AFTER focus leaves a note, so the
+   * just-edited note's automatic fixes must not depend on it being active.
+   * UI state (pane/badge) is untouched; it tracks the active file only.
+   */
+  private async autoFixInBackground(file: TFile): Promise<void> {
+    if (this.autoFixing || !this.loader.base) return;
+    const auto = this.autoFixable(this.computeViolations(file));
+    if (auto.length === 0) return;
+    this.autoFixing = true;
+    try {
+      await this.applyFixesFor(file, auto);
+    } finally {
+      this.autoFixing = false;
     }
   }
 
@@ -201,8 +232,10 @@ export default class VaultWardenPlugin extends Plugin {
    * last (it changes the path).
    */
   async applyFixes(violations: Violation[]): Promise<void> {
-    const file = this.validatedFile;
-    if (!file) return;
+    if (this.validatedFile) await this.applyFixesFor(this.validatedFile, violations);
+  }
+
+  private async applyFixesFor(file: TFile, violations: Violation[]): Promise<void> {
     const eligible = violations.filter((v) => v.mechanical && !v.suppressed && v.suggested_fix);
 
     const frontmatterFixes = eligible.filter(
