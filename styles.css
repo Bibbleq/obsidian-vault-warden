@@ -191,6 +191,28 @@
   cursor: pointer;
 }
 
+.vault-warden-prop-group > summary {
+  cursor: pointer;
+  list-style-position: outside;
+  margin: var(--size-4-2) 0 var(--size-2-2) 0;
+}
+
+.vault-warden-prop-group > summary .vault-warden-prop-section {
+  display: inline-flex;
+  margin: 0;
+}
+
+.vault-warden-prop-group-title {
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-family: var(--font-monospace);
+}
+
+.vault-warden-suggest-create {
+  color: var(--text-accent);
+}
+
 .vault-warden-chip {
   background: var(--background-secondary);
   border-radius: var(--radius-s);

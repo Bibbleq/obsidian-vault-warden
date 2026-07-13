@@ -131,47 +131,61 @@ export class WardenView extends ItemView {
     const section = container.createEl("div", { cls: "vault-warden-props" });
     section.createEl("div", { text: "Properties", cls: "vault-warden-section-title" });
 
-    // Class row.
     const rawClass = fm["class"];
     const className = Array.isArray(rawClass) ? rawClass[0] : rawClass;
-    const classRow = section.createEl("div", { cls: "vault-warden-prop-row" });
+    const hasClass = typeof className === "string" && className !== "";
+    const manifest = hasClass ? loader.manifests[className as string] : undefined;
+    const hasLayout = Boolean(manifest?.display && manifest.display.length > 0);
+
+    // Core group: class + base fields. Collapsed by default when the class
+    // has its own display layout (the styled sections carry the note).
+    const coreKey = `${hasClass ? className : "?"}/__core`;
+    const core = this.collapsible(section, coreKey, !hasLayout, (summary) => {
+      summary.createEl("span", {
+        text: hasClass ? `class: ${className}` : "no class",
+        cls: "vault-warden-prop-group-title",
+      });
+    });
+    const classRow = core.createEl("div", { cls: "vault-warden-prop-row" });
     classRow.createEl("span", { text: "class", cls: "vault-warden-prop-name" });
     const classValue = classRow.createEl("span", {
-      text: typeof className === "string" && className !== "" ? className : "Set class…",
-      cls:
-        typeof className === "string" && className !== ""
-          ? "vault-warden-prop-value"
-          : "vault-warden-prop-value vault-warden-prop-empty",
+      text: hasClass ? (className as string) : "Set class…",
+      cls: hasClass
+        ? "vault-warden-prop-value"
+        : "vault-warden-prop-value vault-warden-prop-empty",
     });
     classValue.addEventListener("click", () => this.plugin.pickClass(file));
-
-    // Base fields, then the class manifest's fields.
     for (const [name, spec] of Object.entries(loader.base?.fields ?? {})) {
-      this.renderPropRow(section, file, fm, name, spec);
+      this.renderPropRow(core, file, fm, name, spec);
     }
 
-    const manifest =
-      typeof className === "string" ? loader.manifests[className] : undefined;
     if (manifest) {
       const fields = Object.entries(manifest.fields ?? {});
 
-      if (manifest.display && manifest.display.length > 0) {
+      if (hasLayout && manifest.display) {
         const shown = new Set<string>();
         for (const displaySection of manifest.display) {
-          const head = section.createEl("div", { cls: "vault-warden-prop-section" });
-          if (displaySection.color && PALETTE.includes(displaySection.color)) {
-            head.style.color = `var(--color-${displaySection.color})`;
-          }
-          if (displaySection.icon) {
-            const iconEl = head.createEl("span", { cls: "vault-warden-prop-section-icon" });
-            setIcon(iconEl, displaySection.icon);
-          }
-          head.createEl("span", { text: displaySection.section });
+          const group = this.collapsible(
+            section,
+            `${className}/${displaySection.section}`,
+            true,
+            (summary) => {
+              const head = summary.createEl("span", { cls: "vault-warden-prop-section" });
+              if (displaySection.color && PALETTE.includes(displaySection.color)) {
+                head.style.color = `var(--color-${displaySection.color})`;
+              }
+              if (displaySection.icon) {
+                const iconEl = head.createEl("span", { cls: "vault-warden-prop-section-icon" });
+                setIcon(iconEl, displaySection.icon);
+              }
+              head.createEl("span", { text: displaySection.section });
+            }
+          );
           for (const entry of displaySection.fields) {
             shown.add(entry.field);
             const spec =
               manifest.fields?.[entry.field] ?? loader.base?.fields?.[entry.field] ?? null;
-            this.renderPropRow(section, file, fm, entry.field, spec, {
+            this.renderPropRow(group, file, fm, entry.field, spec, {
               label: entry.label ?? undefined,
               icon: entry.icon ?? undefined,
             });
@@ -201,6 +215,25 @@ export class WardenView extends ItemView {
         btn.addEventListener("click", () => void this.plugin.applyClassDefaults(file));
       }
     }
+  }
+
+  /** A <details> group whose open/closed state persists in plugin settings. */
+  private collapsible(
+    parent: HTMLElement,
+    key: string,
+    defaultOpen: boolean,
+    buildSummary: (summary: HTMLElement) => void
+  ): HTMLElement {
+    const state = this.plugin.settings.collapsedSections;
+    const open = state[key] === undefined ? defaultOpen : !state[key];
+    const details = parent.createEl("details", { cls: "vault-warden-prop-group" });
+    if (open) details.setAttr("open", "");
+    buildSummary(details.createEl("summary"));
+    details.addEventListener("toggle", () => {
+      state[key] = !details.open;
+      void this.plugin.saveSettings();
+    });
+    return details;
   }
 
   /** Render a value: wikilinks become clickable internal links. */

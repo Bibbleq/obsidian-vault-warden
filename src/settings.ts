@@ -29,12 +29,15 @@ export interface VaultWardenSettings {
   autoFix: Record<string, boolean>;
   /** Last-open settings tab. */
   settingsTab: string;
+  /** Pane group key -> collapsed (true) / expanded (false). Absent = default. */
+  collapsedSections: Record<string, boolean>;
 }
 
 export const DEFAULT_SETTINGS: VaultWardenSettings = {
   schemaPath: "_vault/Metadata Sources/Schemas/Vault.yaml",
   autoFix: {},
   settingsTab: "Overview",
+  collapsedSections: {},
 };
 
 const TABS = ["Overview", "Rules", "Classes", "Title sync", "Exceptions"] as const;

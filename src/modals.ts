@@ -28,29 +28,64 @@ export class FileLinkSuggestModal extends SuggestModal<TFile> {
   }
 }
 
-/** Pick one value from a closed list (select/multi-backed fields). */
-export class ValueSuggestModal extends SuggestModal<string> {
+interface ValueSuggestion {
+  value: string;
+  create?: boolean;
+}
+
+/**
+ * Pick one value from a closed list (select/multi-backed fields). When
+ * `onCreate` is provided and the typed query matches no existing option, an
+ * "Add option" entry appears — choosing it persists the new option (via
+ * onCreate, which writes it into the schema/source list) AND applies it.
+ */
+export class ValueSuggestModal extends SuggestModal<ValueSuggestion> {
   private values: string[];
   private onPick: (value: string) => void;
+  private onCreate?: (value: string) => void;
 
-  constructor(app: App, values: string[], placeholder: string, onPick: (value: string) => void) {
+  constructor(
+    app: App,
+    values: string[],
+    placeholder: string,
+    onPick: (value: string) => void,
+    onCreate?: (value: string) => void
+  ) {
     super(app);
     this.values = values;
     this.onPick = onPick;
+    this.onCreate = onCreate;
     this.setPlaceholder(placeholder);
   }
 
-  getSuggestions(query: string): string[] {
+  getSuggestions(query: string): ValueSuggestion[] {
     const q = query.toLowerCase();
-    return this.values.filter((v) => v.toLowerCase().includes(q));
+    const items: ValueSuggestion[] = this.values
+      .filter((v) => v.toLowerCase().includes(q))
+      .map((value) => ({ value }));
+    const typed = query.trim();
+    if (
+      this.onCreate &&
+      typed !== "" &&
+      !this.values.some((v) => v.toLowerCase() === typed.toLowerCase())
+    ) {
+      items.push({ value: typed, create: true });
+    }
+    return items;
   }
 
-  renderSuggestion(value: string, el: HTMLElement): void {
-    el.setText(value);
+  renderSuggestion(item: ValueSuggestion, el: HTMLElement): void {
+    if (item.create) {
+      el.setText(`＋ Add option: ${item.value}`);
+      el.addClass("vault-warden-suggest-create");
+    } else {
+      el.setText(item.value);
+    }
   }
 
-  onChooseSuggestion(value: string): void {
-    this.onPick(value);
+  onChooseSuggestion(item: ValueSuggestion): void {
+    if (item.create && this.onCreate) this.onCreate(item.value);
+    this.onPick(item.value);
   }
 }
 

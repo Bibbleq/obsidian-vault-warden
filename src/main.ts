@@ -5,6 +5,7 @@ import { analyzeTitle } from "./engine/titlesync";
 import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
 import { isBodyEmpty, renderScaffold, setFirstH1, splitFrontmatter } from "./body";
 import { SchemaLoader } from "./loader";
+import { appendToSeq } from "./schemawrite";
 import {
   DatePromptModal,
   FileLinkSuggestModal,
@@ -144,6 +145,7 @@ export default class VaultWardenPlugin extends Plugin {
       ...DEFAULT_SETTINGS,
       ...data,
       autoFix: { ...DEFAULT_SETTINGS.autoFix, ...(data.autoFix ?? {}) },
+      collapsedSections: { ...(data.collapsedSections ?? {}) },
     };
   }
 
@@ -364,7 +366,13 @@ export default class VaultWardenPlugin extends Plugin {
     const apply = (value: string) => void this.applyManualValue(violationToFix, value);
     const allowed = this.allowedValuesFor(file, field);
     if (allowed && allowed.length > 0) {
-      new ValueSuggestModal(this.app, allowed, `Value for ${field}…`, apply).open();
+      new ValueSuggestModal(
+        this.app,
+        allowed,
+        `Value for ${field}…`,
+        apply,
+        this.valueCreator(file, field)
+      ).open();
       return;
     }
 
@@ -486,6 +494,56 @@ export default class VaultWardenPlugin extends Plugin {
     });
   }
 
+  /**
+   * Where a field's allowed values live, as an "append new option" writer —
+   * the source line-list note for select:<Source> fields, otherwise the
+   * inline values list in the owning manifest / vault schema.
+   */
+  private valueCreator(file: TFile, field: string): ((value: string) => void) | undefined {
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const rawClass = fm?.["class"];
+    const className = Array.isArray(rawClass) ? rawClass[0] : rawClass;
+    const classSpec =
+      typeof className === "string" ? this.loader.manifests[className]?.fields?.[field] : undefined;
+    const baseSpec = this.loader.base?.fields?.[field];
+    const spec = classSpec ?? baseSpec;
+    if (!spec?.values) return undefined;
+
+    if (spec.source) {
+      const sourceName = spec.source;
+      return (value) => void this.appendSourceValue(sourceName, value);
+    }
+    if (classSpec && typeof className === "string") {
+      const path = this.loader.manifestPaths[className];
+      if (path) {
+        return (value) =>
+          void this.editSchemaFile(path, (s) => appendToSeq(s, ["fields", field, "values"], value));
+      }
+    }
+    const basePath = this.loader.baseFilePath;
+    if (baseSpec && basePath) {
+      return (value) =>
+        void this.editSchemaFile(basePath, (s) => appendToSeq(s, ["fields", field, "values"], value));
+    }
+    return undefined;
+  }
+
+  /** Append a value as a new line in a Metadata Sources line-list note. */
+  private async appendSourceValue(sourceName: string, value: string): Promise<void> {
+    const folder = this.loader.sourcesFolder;
+    const path = folder === "" ? `${sourceName}.md` : `${folder}/${sourceName}.md`;
+    const file = this.app.vault.getFileByPath(path);
+    if (!file) {
+      new Notice(`Vault Warden: source note not found: ${path}`);
+      return;
+    }
+    await this.app.vault.process(file, (text) =>
+      text.endsWith("\n") ? `${text}${value}\n` : `${text}\n${value}\n`
+    );
+    await this.reloadSchemas();
+    new Notice(`Added "${value}" to ${sourceName}.`);
+  }
+
   /** Open the right editor widget for a field and write the chosen value. */
   editField(file: TFile, field: string, spec: FieldSpec | null): void {
     const isList = spec?.type === "multi" || spec?.type === "list";
@@ -493,7 +551,13 @@ export default class VaultWardenPlugin extends Plugin {
       void (isList ? this.addToListField(file, field, value) : this.setField(file, field, value));
 
     if (spec?.values && spec.values.length > 0) {
-      new ValueSuggestModal(this.app, spec.values, `Value for ${field}…`, write).open();
+      new ValueSuggestModal(
+        this.app,
+        spec.values,
+        `Value for ${field}…`,
+        write,
+        this.valueCreator(file, field)
+      ).open();
       return;
     }
     if (spec?.type === "date" || spec?.type === "datetime") {
