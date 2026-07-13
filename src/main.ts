@@ -1,7 +1,9 @@
 import { Plugin, TAbstractFile, TFile, debounce } from "obsidian";
 import { validate } from "./engine/validate";
-import type { ValidationInput, Violation } from "./engine/types";
+import { applyAllFixes, applyFixToFrontmatter } from "./engine/fixops";
+import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
 import { SchemaLoader } from "./loader";
+import { TextPromptModal, ValueSuggestModal } from "./modals";
 import {
   DEFAULT_SETTINGS,
   VaultWardenSettings,
@@ -15,6 +17,8 @@ export default class VaultWardenPlugin extends Plugin {
 
   /** Violations for the active file from the most recent validation. */
   violations: Violation[] = [];
+  /** The file the current `violations` belong to (fix buttons target this). */
+  validatedFile: TFile | null = null;
 
   private statusBarEl: HTMLElement | null = null;
 
@@ -106,10 +110,12 @@ export default class VaultWardenPlugin extends Plugin {
     const file = this.app.workspace.getActiveFile();
     if (!file || file.extension !== "md" || !this.loader.base) {
       this.violations = [];
+      this.validatedFile = null;
       this.updateBadge(null);
       this.refreshView();
       return;
     }
+    this.validatedFile = file;
     this.violations = validate(this.buildInput(file));
     this.updateBadge(this.violations.filter((v) => !v.suppressed).length);
     this.refreshView();
@@ -148,6 +154,83 @@ export default class VaultWardenPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_WARDEN)) {
       if (leaf.view instanceof WardenView) leaf.view.render();
     }
+  }
+
+  /** Apply the mechanical suggested_fix of the given violations in ONE frontmatter write. */
+  async applyFixes(violations: Violation[]): Promise<void> {
+    const file = this.validatedFile;
+    if (!file) return;
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      applyAllFixes(fm, violations);
+    });
+    // metadataCache 'changed' re-validates; nothing else to do.
+  }
+
+  /** Manual override: prompt for a value (schema-fed picker where possible), then set it. */
+  openManualFix(violationToFix: Violation): void {
+    const file = this.validatedFile;
+    const field = violationToFix.field;
+    if (!file || !field) return;
+
+    const apply = (value: string) => void this.applyManualValue(violationToFix, value);
+    const allowed = this.allowedValuesFor(file, field);
+    if (allowed && allowed.length > 0) {
+      new ValueSuggestModal(this.app, allowed, `Value for ${field}…`, apply).open();
+    } else {
+      new TextPromptModal(
+        this.app,
+        `Set ${field}`,
+        violationToFix.found ?? "",
+        apply
+      ).open();
+    }
+  }
+
+  private async applyManualValue(violationToFix: Violation, raw: string): Promise<void> {
+    const file = this.validatedFile;
+    const field = violationToFix.field;
+    if (!file || !field || raw.trim() === "") return;
+
+    const spec = this.fieldSpecFor(file, field);
+    const value: unknown = spec?.type === "number" && raw.trim() !== "" && !isNaN(Number(raw))
+      ? Number(raw)
+      : raw;
+
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      if (field === "tags" && violationToFix.found) {
+        applyFixToFrontmatter(
+          fm,
+          { op: "replace_tag", field: "tags", found: violationToFix.found, value },
+          violationToFix.found
+        );
+      } else {
+        // List-aware: replaces the offending item when the field holds a list.
+        applyFixToFrontmatter(
+          fm,
+          { op: "set_field", field, value },
+          violationToFix.found ?? null
+        );
+      }
+    });
+  }
+
+  /** The schema's FieldSpec for a field on this file: class manifest first, then base. */
+  private fieldSpecFor(file: TFile, field: string): FieldSpec | null {
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const classValue = fm?.["class"];
+    const className = Array.isArray(classValue) ? classValue[0] : classValue;
+    if (typeof className === "string") {
+      const spec = this.loader.manifests[className]?.fields?.[field];
+      if (spec) return spec;
+    }
+    return this.loader.base?.fields?.[field] ?? null;
+  }
+
+  /** Allowed values for a field, if it's backed by a closed list. Special case: class. */
+  private allowedValuesFor(file: TFile, field: string): string[] | null {
+    if (field === "class") return Object.keys(this.loader.manifests).sort();
+    const spec = this.fieldSpecFor(file, field);
+    return spec?.values && spec.values.length > 0 ? spec.values : null;
   }
 
   private updateBadge(count: number | null): void {

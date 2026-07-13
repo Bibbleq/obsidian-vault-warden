@@ -140,6 +140,94 @@ export class VaultWardenSettingTab extends PluginSettingTab {
         list.createEl("li", { text: err });
       }
     }
+    this.renderRules(el);
+  }
+
+  /** What the loaded schema activates, rule by rule, grouped by category. */
+  private renderRules(el: HTMLElement): void {
+    const loader = this.plugin.loader;
+    const base = loader.base;
+    if (!base) return;
+
+    el.createEl("h3", { text: "Active rules" });
+    const table = el.createEl("div", { cls: "vault-warden-rules" });
+
+    const category = (title: string) =>
+      table.createEl("div", { cls: "vault-warden-rules-category", text: title });
+    const rule = (ids: string, active: boolean, detail: string) => {
+      const row = table.createEl("div", { cls: "vault-warden-rules-row" });
+      row.createEl("code", { text: ids });
+      row.createEl("span", {
+        text: active ? detail : `inactive — ${detail}`,
+        cls: active ? "" : "vault-warden-rule-inactive",
+      });
+    };
+
+    category("Base fields (every note)");
+    for (const name of ["area", "notetype", "origin"]) {
+      const spec = base.fields[name];
+      const upper = name.toUpperCase();
+      if (spec) {
+        const source = spec.source ? ` from ${spec.source}` : "";
+        const unless = spec.required_unless
+          ? `; optional when ${spec.required_unless} is set`
+          : "";
+        rule(
+          `FM-${upper}-MISSING · FM-${upper}-INVALID`,
+          true,
+          `${spec.values?.length ?? 0} allowed value(s)${source}${unless}`
+        );
+      } else {
+        rule(`FM-${upper}-MISSING · FM-${upper}-INVALID`, false, "field not in the vault schema");
+      }
+    }
+
+    category("Tags (every note)");
+    rule("TAG-FORMAT · TAG-CASE", true, "PascalCase alphanumeric segments joined by /");
+    rule("TAG-DEPTH", true, `at most ${base.tags.max_depth} level(s)`);
+    rule(
+      "TAG-RETIRED",
+      base.tags.retired.length > 0,
+      base.tags.retired.length > 0
+        ? `${base.tags.retired.length} retired tag(s)`
+        : "no retired tags listed"
+    );
+    rule("TAG-DUPLICATE", true, "no exact duplicate entries");
+
+    category("Dates");
+    rule(
+      "DATE-FORMAT",
+      true,
+      `ISO check on class date fields and any field ending ${base.date_name_suffixes.join(" / ")}` +
+        (base.presence_only.length > 0
+          ? `; exempt: ${base.presence_only.join(", ")}`
+          : "")
+    );
+    rule("CREATED-MISSING", true, "created must be present on every note");
+
+    const classCount = Object.keys(loader.manifests).length;
+    category("Classes");
+    rule(
+      "CLASS-UNKNOWN · CLASS-FIELD-MISSING · CLASS-FIELD-TYPE · CLASS-FIELD-VALUE",
+      classCount > 0,
+      classCount > 0 ? `${classCount} class manifest(s)` : "no class manifests loaded"
+    );
+
+    category("Folder locations");
+    rule(
+      "CLASS-EXPECTED · CLASS-MISFILED",
+      loader.classLocations.length > 0,
+      loader.classLocations.length > 0
+        ? `${loader.classLocations.length} mapped folder prefix(es)`
+        : "no class_locations file"
+    );
+
+    el.createEl("p", {
+      cls: "vault-warden-rules-note",
+      text:
+        "Per-note opt-out: list rule IDs under validator_ignore in a note's frontmatter. " +
+        `Vault-wide: ${loader.exceptions.length} exception entr${loader.exceptions.length === 1 ? "y" : "ies"} loaded from the exceptions file.`,
+    });
   }
 
   private async scaffoldStarter(): Promise<void> {

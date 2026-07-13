@@ -58,6 +58,47 @@
   overflow-wrap: anywhere;
 }
 
+.vault-warden-toolbar {
+  margin-bottom: var(--size-4-2);
+}
+
+.vault-warden-item-actions {
+  display: flex;
+  gap: var(--size-4-1);
+  margin-top: var(--size-2-3);
+  flex-wrap: wrap;
+}
+
+.vault-warden-item-actions button {
+  font-size: var(--font-ui-smaller);
+  padding: var(--size-2-1) var(--size-4-1);
+}
+
+.vault-warden-rules-category {
+  font-weight: var(--font-semibold);
+  margin-top: var(--size-4-3);
+  margin-bottom: var(--size-2-2);
+}
+
+.vault-warden-rules-row {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: baseline;
+  font-size: var(--font-ui-small);
+  margin-bottom: var(--size-2-1);
+  flex-wrap: wrap;
+}
+
+.vault-warden-rule-inactive {
+  color: var(--text-faint);
+}
+
+.vault-warden-rules-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-top: var(--size-4-3);
+}
+
 .vault-warden-suppressed,
 .vault-warden-load-errors {
   margin-top: var(--size-4-3);

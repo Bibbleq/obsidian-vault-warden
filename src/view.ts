@@ -57,6 +57,16 @@ export class WardenView extends ItemView {
 
     const active = this.plugin.violations.filter((v) => !v.suppressed);
     const suppressed = this.plugin.violations.filter((v) => v.suppressed);
+    const mechanical = active.filter((v) => v.mechanical && v.suggested_fix);
+
+    if (mechanical.length > 1) {
+      const bar = container.createEl("div", { cls: "vault-warden-toolbar" });
+      const fixAll = bar.createEl("button", {
+        text: `Fix all (${mechanical.length})`,
+        cls: "mod-cta",
+      });
+      fixAll.addEventListener("click", () => void this.plugin.applyFixes(mechanical));
+    }
 
     if (active.length === 0) {
       container.createEl("p", {
@@ -66,7 +76,7 @@ export class WardenView extends ItemView {
     } else {
       const list = container.createEl("div", { cls: "vault-warden-list" });
       for (const violation of active) {
-        this.renderViolation(list, violation);
+        this.renderViolation(list, violation, true);
       }
     }
 
@@ -83,19 +93,12 @@ export class WardenView extends ItemView {
     this.renderLoadErrors(container);
   }
 
-  private renderViolation(parent: HTMLElement, violation: Violation): void {
+  private renderViolation(parent: HTMLElement, violation: Violation, fixable = false): void {
     const item = parent.createEl("div", { cls: "vault-warden-item" });
     const head = item.createEl("div", { cls: "vault-warden-item-head" });
     head.createEl("span", { text: violation.rule, cls: "vault-warden-rule" });
     if (violation.field) {
       head.createEl("span", { text: violation.field, cls: "vault-warden-field" });
-    }
-    if (violation.mechanical) {
-      head.createEl("span", {
-        text: "mechanical",
-        cls: "vault-warden-mechanical",
-        attr: { "aria-label": "A deterministic fix exists" },
-      });
     }
     const body = item.createEl("div", { cls: "vault-warden-item-body" });
     if (violation.found != null) {
@@ -103,6 +106,24 @@ export class WardenView extends ItemView {
     }
     if (violation.expected != null) {
       body.createEl("div", { text: `expected: ${violation.expected}` });
+    }
+    if (!fixable) return;
+
+    const actions = item.createEl("div", { cls: "vault-warden-item-actions" });
+    if (violation.mechanical && violation.suggested_fix) {
+      const label =
+        violation.suggested_fix.op === "remove_tag"
+          ? "Remove"
+          : violation.suggested_fix.op === "set_field" &&
+              violation.suggested_fix.value != null
+            ? `Fix → ${String(violation.suggested_fix.value)}`
+            : "Fix";
+      const fixBtn = actions.createEl("button", { text: label, cls: "mod-cta" });
+      fixBtn.addEventListener("click", () => void this.plugin.applyFixes([violation]));
+    }
+    if (violation.field) {
+      const setBtn = actions.createEl("button", { text: "Set…" });
+      setBtn.addEventListener("click", () => this.plugin.openManualFix(violation));
     }
   }
 
