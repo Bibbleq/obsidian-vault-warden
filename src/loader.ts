@@ -49,6 +49,12 @@ export class SchemaLoader {
   /** Human-readable problems from the last load. */
   loadErrors: string[] = [];
 
+  /** Resolved file paths from the last load (for the settings GUI's writes). */
+  baseFilePath: string | null = null;
+  manifestPaths: Record<string, string> = {};
+  classLocationsPath: string | null = null;
+  exceptionsPath: string | null = null;
+
   constructor(app: App, getSchemaPath: () => string) {
     this.app = app;
     this.getSchemaPath = getSchemaPath;
@@ -116,11 +122,17 @@ export class SchemaLoader {
     this.titleSync = null;
     this.loadErrors = [];
 
+    this.baseFilePath = null;
+    this.manifestPaths = {};
+    this.classLocationsPath = this.findSchemaFile("class_locations")?.path ?? null;
+    this.exceptionsPath = this.findSchemaFile("exceptions")?.path ?? null;
+
     const baseFile = this.findSchemaFile(this.baseStem());
     if (!baseFile) {
       this.loadErrors.push(`Base schema not found: ${this.getSchemaPath()}`);
       return;
     }
+    this.baseFilePath = baseFile.path;
 
     const baseData = await this.parseFile(baseFile);
     if (baseData === null) return;
@@ -149,7 +161,10 @@ export class SchemaLoader {
         const data = await this.parseFile(child);
         if (data === null) continue;
         const manifest = await this.parseManifest(stem, data, child.path);
-        if (manifest) this.manifests[manifest.name] = manifest;
+        if (manifest) {
+          this.manifests[manifest.name] = manifest;
+          this.manifestPaths[manifest.name] = child.path;
+        }
       }
     }
 

@@ -8,6 +8,7 @@ import {
   normalizePath,
 } from "obsidian";
 import type VaultWardenPlugin from "./main";
+import { renderSchemaEditor } from "./schemaeditor";
 import {
   STARTER_BASE_YAML,
   STARTER_CLASS_FILENAME,
@@ -140,6 +141,8 @@ export class VaultWardenSettingTab extends PluginSettingTab {
 
     this.statusEl = containerEl.createDiv({ cls: "vault-warden-settings-status" });
     this.updateStatus();
+
+    renderSchemaEditor(containerEl, this.plugin, () => this.display());
   }
 
   private statusEl: HTMLElement | null = null;

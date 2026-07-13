@@ -1,6 +1,6 @@
 {
   "name": "vault-warden",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Schema-driven, write-time vault hygiene for Obsidian. Validates the active note's frontmatter against YAML rule manifests stored in your vault.",
   "main": "main.js",
   "scripts": {
@@ -20,5 +20,8 @@
     "tslib": "^2.8.1",
     "typescript": "~5.9.3",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
   }
 }

@@ -419,6 +419,38 @@ export default class VaultWardenPlugin extends Plugin {
     });
   }
 
+  // --- schema editing (settings GUI) ---------------------------------------
+
+  /**
+   * Apply a comment-preserving text transform to a schema file and reload
+   * immediately (so the settings GUI re-renders against fresh state).
+   */
+  async editSchemaFile(filePath: string, transform: (text: string) => string): Promise<boolean> {
+    const file = this.app.vault.getFileByPath(filePath);
+    if (!file) {
+      new Notice(`Vault Warden: schema file not found: ${filePath}`);
+      return false;
+    }
+    await this.app.vault.process(file, transform);
+    await this.reloadSchemas();
+    return true;
+  }
+
+  /** Create a schema-folder file (class_locations/exceptions/new class) if absent. */
+  async createSchemaFile(fileName: string, content: string): Promise<string | null> {
+    const folder = this.loader.schemasFolder;
+    const path = folder === "" ? fileName : `${folder}/${fileName}`;
+    if (this.app.vault.getAbstractFileByPath(path)) return path;
+    try {
+      await this.app.vault.create(path, content);
+    } catch (e) {
+      new Notice(`Vault Warden: could not create ${path}: ${String(e)}`);
+      return null;
+    }
+    await this.reloadSchemas();
+    return path;
+  }
+
   // --- field editor (properties section of the pane) -----------------------
 
   /** Set one frontmatter field (scalar). */

@@ -172,6 +172,23 @@
   color: var(--text-faint);
 }
 
+.vault-warden-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2-1);
+  align-items: center;
+  max-width: 320px;
+  justify-content: flex-end;
+}
+
+.vault-warden-chips input {
+  width: 90px;
+}
+
+.vault-warden-class-modal {
+  width: min(720px, 90vw);
+}
+
 .vault-warden-suppressed,
 .vault-warden-load-errors {
   margin-top: var(--size-4-3);
