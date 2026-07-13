@@ -689,6 +689,25 @@ export class ClassEditorModal extends Modal {
             : setPath(s, ["fields", name, "default"], v)
         );
       });
+      debouncedText(
+        row,
+        spec.required_when ? `${spec.required_when.field}=${spec.required_when.equals}` : "",
+        "required when (field=value)",
+        (v) => {
+          const raw = v.trim();
+          if (raw === "") {
+            void edit((s) => deletePath(s, ["fields", name, "required_when"]));
+            return;
+          }
+          const eq = raw.indexOf("=");
+          if (eq <= 0 || eq === raw.length - 1) return; // incomplete — wait for valid input
+          const condField = raw.slice(0, eq).trim();
+          const equals = raw.slice(eq + 1).trim();
+          void edit((s) =>
+            setPath(s, ["fields", name, "required_when"], { field: condField, equals })
+          );
+        }
+      );
       row.addToggle((toggle) =>
         toggle
           .setValue(Boolean(spec.required))
