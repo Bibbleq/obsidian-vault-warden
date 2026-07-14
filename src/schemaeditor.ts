@@ -163,6 +163,12 @@ export function renderRulesTab(
     }
   );
   fixModeDropdown(dates, plugin, "DATE-FORMAT", "Convert space-separated datetimes to ISO (T) form");
+  fixModeDropdown(
+    dates,
+    plugin,
+    "CREATED-MISSING",
+    "Stamp created from the file's creation timestamp"
+  );
 
   const fields = sectionCard(container, "Base fields");
   fields.createEl("p", {

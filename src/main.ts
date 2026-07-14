@@ -19,11 +19,19 @@ import {
 } from "./settings";
 import { VIEW_TYPE_WARDEN, WardenView } from "./view";
 
+/** Epoch millis as local ISO datetime, minute precision (YYYY-MM-DDTHH:mm). */
+function formatLocalDatetime(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 /** Local date as YYYY-MM-DD (the engine's `today` injection). */
 function localToday(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return formatLocalDatetime(Date.now()).slice(0, 10);
 }
 
 /** Resolve {{today}} / {{now}} tokens in defaults and creation_stamp values. */
@@ -196,6 +204,21 @@ export default class VaultWardenPlugin extends Plugin {
       all = all.concat(
         applySuppressions(frontmatter, file.path, this.loader.exceptions, titleViolations)
       );
+    }
+
+    // Plugin-side enrichment: the engine can't know the filesystem timestamp,
+    // but the adapter can — CREATED-MISSING gets a mechanical fix stamping
+    // created from the file's creation time (the plugin-side analogue of the
+    // batch validator's git-history stamp mode).
+    for (const v of all) {
+      if (v.rule === "CREATED-MISSING" && !v.suggested_fix) {
+        v.mechanical = true;
+        v.suggested_fix = {
+          op: "set_field",
+          field: "created",
+          value: formatLocalDatetime(file.stat.ctime),
+        };
+      }
     }
     return all;
   }
@@ -564,15 +587,25 @@ export default class VaultWardenPlugin extends Plugin {
       ).open();
       return;
     }
+    // Prefill from the current value (list edits add a NEW entry — no prefill).
+    const currentText =
+      isList || current == null || typeof current === "object" ? "" : String(current);
+
     if (spec?.type === "date" || spec?.type === "datetime") {
-      new DatePromptModal(this.app, `Set ${field}`, null, write).open();
+      let initial: string | null = null;
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(currentText)) {
+        initial = currentText.slice(0, 16).replace(" ", "T");
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(currentText)) {
+        initial = `${currentText}T00:00`;
+      }
+      new DatePromptModal(this.app, `Set ${field}`, initial, write).open();
       return;
     }
     if (spec?.type === "wikilink") {
       new FileLinkSuggestModal(this.app, (linkText) => write(linkText)).open();
       return;
     }
-    new TextPromptModal(this.app, `Set ${field}`, "", (raw) => {
+    new TextPromptModal(this.app, `Set ${field}`, currentText, (raw) => {
       const value =
         spec?.type === "number" && raw.trim() !== "" && !isNaN(Number(raw)) ? Number(raw) : raw;
       write(value);
@@ -682,6 +715,10 @@ export default class VaultWardenPlugin extends Plugin {
         if (cur == null || cur === "" || (Array.isArray(cur) && cur.length === 0)) {
           fm[name] = resolveTokens(spec.default);
         }
+      }
+      // New notes always get created stamped from the filesystem timestamp.
+      if (fm["created"] == null || fm["created"] === "") {
+        fm["created"] = formatLocalDatetime(file.stat.ctime);
       }
     });
     await this.insertScaffold(file, className, true);

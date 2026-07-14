@@ -50,6 +50,7 @@ export const FIX_RULE_TAB: Record<string, string> = {
   "TAG-RETIRED": "Rules",
   "TAG-DUPLICATE": "Rules",
   "DATE-FORMAT": "Rules",
+  "CREATED-MISSING": "Rules",
   "CLASS-EXPECTED": "Classes",
   "STATUS-STALE": "Classes",
   "H1-MISSING": "Title sync",
