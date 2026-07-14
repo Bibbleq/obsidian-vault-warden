@@ -546,7 +546,11 @@ export default class VaultWardenPlugin extends Plugin {
 
   /** Open the right editor widget for a field and write the chosen value. */
   editField(file: TFile, field: string, spec: FieldSpec | null): void {
-    const isList = spec?.type === "multi" || spec?.type === "list";
+    // Spec-less fields with an existing list value (e.g. tags surfaced in a
+    // display layout) append rather than clobber the list.
+    const current = this.app.metadataCache.getFileCache(file)?.frontmatter?.[field];
+    const isList =
+      spec?.type === "multi" || spec?.type === "list" || Array.isArray(current);
     const write = (value: unknown) =>
       void (isList ? this.addToListField(file, field, value) : this.setField(file, field, value));
 

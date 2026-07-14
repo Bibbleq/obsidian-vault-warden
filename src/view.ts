@@ -236,24 +236,34 @@ export class WardenView extends ItemView {
     return details;
   }
 
-  /** Render a value: wikilinks become clickable internal links. */
+  /** Render a value: wikilinks and URLs become clickable links. */
   private renderValueText(parent: HTMLElement, raw: unknown, sourcePath: string): void {
     const text = String(raw);
     const match = typeof raw === "string" ? WIKILINK_VALUE_RE.exec(raw.trim()) : null;
-    if (!match) {
-      parent.createEl("span", { text });
+    if (match) {
+      const target = match[1].trim();
+      const link = parent.createEl("a", {
+        text: match[2]?.trim() || target,
+        cls: "internal-link",
+      });
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        void this.app.workspace.openLinkText(target, sourcePath);
+      });
       return;
     }
-    const target = match[1].trim();
-    const link = parent.createEl("a", {
-      text: match[2]?.trim() || target,
-      cls: "internal-link",
-    });
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      void this.app.workspace.openLinkText(target, sourcePath);
-    });
+    if (typeof raw === "string" && /^https?:\/\//.test(raw.trim())) {
+      const url = raw.trim();
+      const link = parent.createEl("a", {
+        text: url.replace(/^https?:\/\/(www\.)?/, ""),
+        cls: "external-link vault-warden-url",
+        href: url,
+      });
+      link.addEventListener("click", (e) => e.stopPropagation());
+      return;
+    }
+    parent.createEl("span", { text });
   }
 
   private renderPropRow(
