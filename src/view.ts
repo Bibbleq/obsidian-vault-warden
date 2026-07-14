@@ -316,6 +316,20 @@ export class WardenView extends ItemView {
       this.renderValueText(valueEl, value, file.path);
       valueEl.addEventListener("click", () => this.plugin.editField(file, name, spec));
     }
+
+    // Explicit edit affordance: link-valued rows navigate on value click, so
+    // the pencil is the guaranteed way in. List rows already have the + chip.
+    if (!(isList && Array.isArray(value) && value.length > 0)) {
+      const editBtn = row.createEl("span", {
+        cls: "vault-warden-prop-edit",
+        attr: { "aria-label": `Edit ${opts.label ?? name}` },
+      });
+      setIcon(editBtn, "pencil");
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.plugin.editField(file, name, spec);
+      });
+    }
   }
 
   private renderViolation(parent: HTMLElement, violation: Violation, fixable = false): void {

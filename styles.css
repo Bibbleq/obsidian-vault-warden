@@ -191,6 +191,23 @@
   cursor: pointer;
 }
 
+.vault-warden-prop-edit {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 0 var(--size-2-1);
+}
+
+.vault-warden-prop-edit:hover {
+  color: var(--text-normal);
+}
+
+.vault-warden-prop-edit svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+
 .vault-warden-prop-group > summary {
   cursor: pointer;
   list-style-position: outside;
