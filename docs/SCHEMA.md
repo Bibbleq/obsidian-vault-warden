@@ -179,10 +179,23 @@ violations **suppressed-but-reported**; without it the note is fully skipped.
 
 † = can be mechanical (violation carries a concrete `suggested_fix`).
 
-Batch-only rules (`FILENAME-COLLISION`, `LINK-BROKEN`, `INBOX-STALE`,
-`AREA-FOLDER-MISMATCH`, `BODY-TAG`, `TAG-SPARSE`, `TAG-TWIN`, `FM-PARSE`, …) are
-deliberately not implemented in the plugin — they need whole-vault context or human
-judgement.
+TAG-CASE / TAG-FORMAT fixes normally PascalCase the tag, but the plugin also
+feeds the engine a map of the vault's established segment casings (from the tag
+index), so a fix can suggest `LLM` over `Llm` where that casing already
+dominates. This is a plugin-side enrichment; the batch validator does the
+equivalent from its own note index.
+
+Two further rules are detected by the plugin adapter (not the pure engine, and
+so absent from the conformance fixtures), report-only:
+
+- `FM-PARSE` — the note opens with a frontmatter block the YAML parser rejected;
+  short-circuits all other rules for that note.
+- `LINK-BROKEN` — one or more `[[wikilinks]]` in the note resolve to no file.
+
+Other batch-only rules (`FILENAME-COLLISION`, `INBOX-STALE`,
+`AREA-FOLDER-MISMATCH`, `BODY-TAG`, `TAG-SPARSE`, `TAG-TWIN`, …) remain
+deliberately unimplemented in the plugin — they need whole-vault context or
+human judgement.
 
 ### Semantics shared by all rules
 

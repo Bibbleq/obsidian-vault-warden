@@ -97,6 +97,24 @@ export function pascalCaseTag(tag: string): string {
 }
 
 /**
+ * Port of `suggest_tag_casing`: per '/'-segment, adopt the vault's established
+ * casing for that segment where the caller supplied one, else PascalCase it.
+ * With no casing map (fixtures / no NoteIndex) this is exactly `pascalCaseTag`.
+ */
+export function suggestTagCasing(
+  tag: string,
+  casings?: Record<string, string> | null
+): string {
+  const segments = tag.replace(/^#+/, "").split("/");
+  const out: string[] = [];
+  for (const segment of segments) {
+    const canonical = casings ? casings[segment.toLowerCase()] : undefined;
+    out.push(canonical || pascalCaseTag(segment));
+  }
+  return out.filter((part) => part.length > 0).join("/");
+}
+
+/**
  * Port of `derive_area`: the longest valid area whose '/'-segments are a
  * prefix of the note's own folder segments. Root-level notes (no folder) or
  * folders matching no configured area return null.

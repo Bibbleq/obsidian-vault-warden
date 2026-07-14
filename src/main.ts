@@ -34,6 +34,22 @@ function localToday(): string {
   return formatLocalDatetime(Date.now()).slice(0, 10);
 }
 
+/**
+ * True when `raw` opens with a frontmatter block whose inner content is
+ * non-empty — used with "the metadata cache has no parsed frontmatter" to
+ * infer a YAML parse error (an empty `---\n---` block is valid, not an error).
+ */
+function hasUnparsedFrontmatter(raw: string): boolean {
+  const lines = raw.split("\n");
+  if (lines[0]?.trim() !== "---") return false;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") {
+      return lines.slice(1, i).some((l) => l.trim() !== "");
+    }
+  }
+  return false;
+}
+
 /** Resolve {{today}} / {{now}} tokens in defaults and creation_stamp values. */
 function resolveTokens(value: unknown): unknown {
   if (typeof value !== "string") return value;
@@ -169,8 +185,36 @@ export default class VaultWardenPlugin extends Plugin {
   /** Guards against auto-fix re-entrancy (fixes trigger change events). */
   private autoFixing = false;
 
-  /** All violations (engine + title sync, suppression applied) for one file. */
-  private computeViolations(file: TFile): Violation[] {
+  /** Vault-wide tag-segment casing map, rebuilt on demand from the tag index. */
+  private buildSegmentCasings(): Record<string, string> {
+    const counts: Record<string, Record<string, number>> = {};
+    // getTags() is a real API but missing from Obsidian's published types.
+    const getTags = (
+      this.app.metadataCache as unknown as { getTags?: () => Record<string, number> }
+    ).getTags;
+    const tags: Record<string, number> = getTags ? getTags.call(this.app.metadataCache) : {};
+    for (const [rawTag, freq] of Object.entries(tags)) {
+      for (const seg of rawTag.replace(/^#+/, "").split("/")) {
+        const trimmed = seg.trim();
+        // Only well-formed segments (not starting lowercase) teach casing.
+        if (trimmed === "" || /^[a-z]/.test(trimmed)) continue;
+        const lower = trimmed.toLowerCase();
+        (counts[lower] ??= {})[trimmed] = (counts[lower]?.[trimmed] ?? 0) + freq;
+      }
+    }
+    const casings: Record<string, string> = {};
+    for (const [lower, variants] of Object.entries(counts)) {
+      casings[lower] = Object.entries(variants).sort((a, b) => b[1] - a[1])[0][0];
+    }
+    return casings;
+  }
+
+  /**
+   * All violations (engine + title sync + plugin-only rules, suppression
+   * applied) for one file. `rawText` (when supplied) enables FM-PARSE
+   * detection, which short-circuits everything else.
+   */
+  private computeViolations(file: TFile, rawText?: string): Violation[] {
     const base = this.loader.base;
     if (!base) return [];
 
@@ -181,6 +225,22 @@ export default class VaultWardenPlugin extends Plugin {
       delete (frontmatter as Record<string, unknown>)["position"];
     }
 
+    // FM-PARSE: a frontmatter block the cache couldn't parse. Short-circuits,
+    // matching the batch validator (a broken note yields only this).
+    if (rawText !== undefined && !frontmatter && hasUnparsedFrontmatter(rawText)) {
+      return applySuppressions(null, file.path, this.loader.exceptions, [
+        {
+          rule: "FM-PARSE",
+          field: null,
+          found: null,
+          expected: "parseable YAML frontmatter",
+          mechanical: false,
+          suggested_fix: null,
+          suppressed: false,
+        },
+      ]);
+    }
+
     const input: ValidationInput = {
       base,
       manifests: this.loader.manifests,
@@ -188,6 +248,7 @@ export default class VaultWardenPlugin extends Plugin {
       exceptions: this.loader.exceptions,
       file: { path: file.path, frontmatter },
       today: localToday(),
+      segment_casings: this.buildSegmentCasings(),
     };
     let all = validate(input);
 
@@ -203,6 +264,27 @@ export default class VaultWardenPlugin extends Plugin {
       });
       all = all.concat(
         applySuppressions(frontmatter, file.path, this.loader.exceptions, titleViolations)
+      );
+    }
+
+    // LINK-BROKEN: the active note's unresolved wikilink targets (report-only).
+    const unresolved = this.app.metadataCache.unresolvedLinks[file.path];
+    const brokenTargets = unresolved ? Object.keys(unresolved) : [];
+    if (brokenTargets.length > 0) {
+      const shownTargets = brokenTargets.slice(0, 10);
+      if (brokenTargets.length > 10) shownTargets.push("…");
+      all = all.concat(
+        applySuppressions(frontmatter, file.path, this.loader.exceptions, [
+          {
+            rule: "LINK-BROKEN",
+            field: null,
+            found: shownTargets.join(", "),
+            expected: "every [[wikilink]] target resolves to a note",
+            mechanical: false,
+            suggested_fix: null,
+            suppressed: false,
+          },
+        ])
       );
     }
 
@@ -240,7 +322,8 @@ export default class VaultWardenPlugin extends Plugin {
       return;
     }
     this.validatedFile = file;
-    const all = this.computeViolations(file);
+    const raw = await this.app.vault.cachedRead(file);
+    const all = this.computeViolations(file, raw);
     this.violations = all;
     this.updateBadge(all.filter((v) => !v.suppressed).length);
     this.refreshView();
@@ -264,7 +347,8 @@ export default class VaultWardenPlugin extends Plugin {
    */
   private async autoFixInBackground(file: TFile): Promise<void> {
     if (this.autoFixing || !this.loader.base) return;
-    const auto = this.autoFixable(this.computeViolations(file));
+    const raw = await this.app.vault.cachedRead(file);
+    const auto = this.autoFixable(this.computeViolations(file, raw));
     if (auto.length === 0) return;
     this.autoFixing = true;
     try {

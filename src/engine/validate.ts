@@ -33,9 +33,9 @@ import {
   type Frontmatter,
   isDictOrList,
   isEmpty,
-  pascalCaseTag,
   prefixesForClass,
   shown,
+  suggestTagCasing,
   valuesEqual,
 } from "./shared";
 
@@ -139,7 +139,11 @@ function splitTagEntries(rawList: unknown[]): { entries: unknown[]; hadComma: bo
 }
 
 /** Port of `_check_tags`: TAG-FORMAT, TAG-CASE, TAG-DEPTH, TAG-RETIRED. */
-function checkTags(frontmatter: Frontmatter, base: BaseSchema): Violation[] {
+function checkTags(
+  frontmatter: Frontmatter,
+  base: BaseSchema,
+  casings?: Record<string, string> | null
+): Violation[] {
   const violations: Violation[] = [];
   const rules = base.tags ?? { max_depth: 2, retired: [] };
   const retiredLower = new Set((rules.retired ?? []).map((t) => t.replace(/^#+/, "").toLowerCase()));
@@ -172,7 +176,7 @@ function checkTags(frontmatter: Frontmatter, base: BaseSchema): Violation[] {
     const normalized = tag.replace(/^#+/, "");
 
     if (!TAG_OK_RE.test(tag)) {
-      const fix = pascalCaseTag(tag);
+      const fix = suggestTagCasing(tag, casings);
       violations.push(
         violation({
           rule: "TAG-FORMAT",
@@ -184,7 +188,7 @@ function checkTags(frontmatter: Frontmatter, base: BaseSchema): Violation[] {
         })
       );
     } else if (tag.split("/").some((seg) => /^[a-z]/.test(seg))) {
-      const fix = pascalCaseTag(tag);
+      const fix = suggestTagCasing(tag, casings);
       violations.push(
         violation({
           rule: "TAG-CASE",
@@ -585,7 +589,7 @@ export const validate: Validate = (input: ValidationInput): Violation[] => {
 
     const violations: Violation[] = [];
     violations.push(...checkBaseFields(path, frontmatter, base));
-    violations.push(...checkTags(frontmatter, base));
+    violations.push(...checkTags(frontmatter, base, input?.segment_casings));
     violations.push(...checkTagDuplicates(frontmatter));
     violations.push(...checkDates(frontmatter, base, manifest));
     violations.push(...checkTimestamps(frontmatter));

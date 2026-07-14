@@ -51,6 +51,15 @@ export const TITLE_RULE_IDS = [
 
 export type TitleRuleId = (typeof TITLE_RULE_IDS)[number];
 
+/**
+ * Plugin-only rules detected by the Obsidian adapter (not the pure engine):
+ * FM-PARSE from raw file text, LINK-BROKEN from the metadata cache. Batch-only
+ * in the Python contract, so absent from the conformance fixtures.
+ */
+export const PLUGIN_RULE_IDS = ["FM-PARSE", "LINK-BROKEN"] as const;
+
+export type PluginRuleId = (typeof PLUGIN_RULE_IDS)[number];
+
 /** `title_sync:` block from the vault schema (plugin-only). */
 export interface TitleSyncConfig {
   /** Characters removed when projecting H1 -> filename. */
@@ -207,6 +216,13 @@ export interface ValidationInput {
    * clock).
    */
   today?: string | null;
+  /**
+   * Lowercased tag segment -> the vault's established casing for it (e.g.
+   * "llm" -> "LLM"). TAG-CASE / TAG-FORMAT fixes adopt these where present,
+   * falling back to PascalCase. Omitted (fixtures) = pure PascalCase, matching
+   * the Python engine with no NoteIndex.
+   */
+  segment_casings?: Record<string, string> | null;
 }
 
 /**
@@ -234,7 +250,7 @@ export interface SuggestedFix {
  * Violation dataclass (minus `path`, which is implicit — one note per call).
  */
 export interface Violation {
-  rule: RuleId | TitleRuleId;
+  rule: RuleId | TitleRuleId | PluginRuleId;
   field?: string | null;
   /** Stringified offending value; null when the problem is absence. */
   found?: string | null;
