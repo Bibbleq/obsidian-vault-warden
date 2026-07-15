@@ -186,12 +186,15 @@ export class SchemaLoader {
       (dates["presence_only"] as unknown[]) ??
       (dates["linter_managed"] as unknown[]) ??
       ["created"];
+    // Retired tags: the `Tags Retired.md` line-list is authoritative when it
+    // exists; otherwise fall back to the legacy inline `tags.retired` block.
+    const retiredFromFile = await this.retiredSourceValues("Tags Retired");
     return {
       version: Number(data["base_schema_version"] ?? 1),
       fields,
       tags: {
         max_depth: Number(tags["max_depth"] ?? 2),
-        retired: stringList(tags["retired"]),
+        retired: retiredFromFile ?? stringList(tags["retired"]),
       },
       date_name_suffixes: Array.isArray(dates["name_suffixes"])
         ? stringList(dates["name_suffixes"])
@@ -352,14 +355,22 @@ export class SchemaLoader {
 
   /** Read a line-per-value source note (every non-empty trimmed line is a value). */
   private async loadSourceValues(sourceName: string): Promise<string[]> {
-    const folder = this.sourcesFolder;
-    const path =
-      folder === "" ? `${sourceName}.md` : `${folder}/${sourceName}.md`;
-    const file = this.app.vault.getFileByPath(path);
-    if (!file) {
+    const values = await this.retiredSourceValues(sourceName);
+    if (values === null) {
+      const folder = this.sourcesFolder;
+      const path = folder === "" ? `${sourceName}.md` : `${folder}/${sourceName}.md`;
       this.loadErrors.push(`Metadata source note missing: ${path}`);
       return [];
     }
+    return values;
+  }
+
+  /** Line-list values for a source note, or null when the note doesn't exist (quiet). */
+  private async retiredSourceValues(sourceName: string): Promise<string[] | null> {
+    const folder = this.sourcesFolder;
+    const path = folder === "" ? `${sourceName}.md` : `${folder}/${sourceName}.md`;
+    const file = this.app.vault.getFileByPath(path);
+    if (!file) return null;
     const raw = await this.app.vault.cachedRead(file);
     return raw
       .split(/\r?\n/)

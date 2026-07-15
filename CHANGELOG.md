@@ -4,6 +4,12 @@ All notable changes to Vault Warden. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions are the plugin's
 release tags (bare, no `v` prefix, per Obsidian convention).
 
+## 0.12.0
+
+- Retired tags read from `Tags Retired.md` (a line-list in Metadata Sources)
+  when present, matching the notetype-governance file convention; the inline
+  `tags.retired` block in the vault schema is the fallback until removed.
+
 ## 0.11.0
 
 - Display layout editor in the class modal: add/remove/reorder sections and
