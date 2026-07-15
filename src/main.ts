@@ -91,7 +91,7 @@ export default class VaultWardenPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "open-violations",
+      id: "open-panel",
       name: "Open note panel",
       callback: () => void this.activateView(),
     });
