@@ -1,5 +1,10 @@
 # Vault Warden schema reference
 
+> **Mirror:** this document is duplicated in the maintainer's vault (as a
+> reference an agent can read without the repo). Any change to the schema format
+> here must be reflected in that vault copy too — and, if it changes rule
+> semantics, in `test/fixtures/` and the Keep validator.
+
 Vault Warden is driven entirely by YAML manifests stored **in your vault**. Nothing about
 your vault's classes, folders, tags, or fields is hardcoded in the plugin.
 
