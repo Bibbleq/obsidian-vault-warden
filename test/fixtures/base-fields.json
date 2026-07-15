@@ -139,7 +139,7 @@
     ]
   },
   {
-    "name": "notetype value not in values produces fm-notetype-invalid",
+    "name": "notetype value not in values produces notetype-unlisted",
     "base": {
       "version": 2,
       "fields": {
@@ -168,7 +168,7 @@
     },
     "expect": [
       {
-        "rule": "FM-NOTETYPE-INVALID",
+        "rule": "NOTETYPE-UNLISTED",
         "field": "notetype",
         "found": "Bogus"
       }
@@ -351,7 +351,11 @@
       "presence_only": []
     },
     "manifests": {
-      "Recipe": { "name": "Recipe", "version": 1, "fields": {} }
+      "Recipe": {
+        "name": "Recipe",
+        "version": 1,
+        "fields": {}
+      }
     },
     "file": {
       "path": "Note.md",
@@ -431,12 +435,12 @@
     },
     "expect": [
       {
-        "rule": "FM-NOTETYPE-INVALID",
+        "rule": "NOTETYPE-UNLISTED",
         "field": "notetype",
         "found": "Bad1"
       },
       {
-        "rule": "FM-NOTETYPE-INVALID",
+        "rule": "NOTETYPE-UNLISTED",
         "field": "notetype",
         "found": "Bad2"
       }
@@ -605,5 +609,80 @@
       }
     },
     "expect": []
+  },
+  {
+    "name": "notetype casing variant of a canonical value produces notetype-case",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Guide"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "notetype": "guide",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "NOTETYPE-CASE",
+        "field": "notetype",
+        "found": "guide"
+      }
+    ]
+  },
+  {
+    "name": "retired notetype produces notetype-retired",
+    "base": {
+      "version": 2,
+      "fields": {
+        "notetype": {
+          "name": "notetype",
+          "type": "multi",
+          "required": true,
+          "values": [
+            "Note"
+          ]
+        }
+      },
+      "tags": {
+        "max_depth": 2,
+        "retired": []
+      },
+      "notetype_retired": [
+        "Inbox"
+      ],
+      "date_name_suffixes": [],
+      "presence_only": []
+    },
+    "file": {
+      "path": "Note.md",
+      "frontmatter": {
+        "notetype": "Inbox",
+        "created": "2026-07-13"
+      }
+    },
+    "expect": [
+      {
+        "rule": "NOTETYPE-RETIRED",
+        "field": "notetype",
+        "found": "Inbox"
+      }
+    ]
   }
 ]

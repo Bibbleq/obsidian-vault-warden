@@ -62,6 +62,12 @@ export function applyFixToFrontmatter(
       return true;
     }
 
+    case "remove": {
+      if (!Object.prototype.hasOwnProperty.call(fm, field)) return false;
+      delete fm[field];
+      return true;
+    }
+
     case "replace_tag": {
       const tagFound = fix.found;
       if (typeof tagFound !== "string") return false;

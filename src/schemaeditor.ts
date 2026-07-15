@@ -206,6 +206,7 @@ export function renderRulesTab(
     );
   }
   fixModeDropdown(fields, plugin, "FM-AREA-MISSING", "Derive the area from the note's folder path");
+  fixModeDropdown(fields, plugin, "NOTETYPE-CASE", "Fix a notetype's casing to the canonical value");
 }
 
 // --------------------------------------------------------------------------

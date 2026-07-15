@@ -141,7 +141,7 @@
         "field": "area"
       },
       {
-        "rule": "FM-NOTETYPE-INVALID",
+        "rule": "NOTETYPE-UNLISTED",
         "field": "notetype",
         "found": "Bogus"
       },

@@ -33,6 +33,9 @@ export const RULE_IDS = [
   "CLASS-EXPECTED",
   "CLASS-MISFILED",
   "STATUS-STALE",
+  "NOTETYPE-CASE",
+  "NOTETYPE-UNLISTED",
+  "NOTETYPE-RETIRED",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -128,6 +131,12 @@ export interface BaseSchema {
   date_name_suffixes: string[];
   /** Date fields exempt from DATE-FORMAT (presence handled elsewhere). */
   presence_only: string[];
+  /**
+   * Retired notetype values (from `Note Types Retired.md`), migrated off by
+   * NOTETYPE-RETIRED — mirrors tags' retired list. Canonical notetypes come
+   * from the `notetype` field's own `values`.
+   */
+  notetype_retired?: string[];
 }
 
 /** One STATUS-STALE trigger. Parsed but unused by the write-time subset. */
@@ -233,6 +242,7 @@ export interface ValidationInput {
 export interface SuggestedFix {
   op:
     | "set_field"
+    | "remove"
     | "replace_tag"
     | "remove_tag"
     | "set_list"

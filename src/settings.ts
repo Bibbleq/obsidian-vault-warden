@@ -45,6 +45,7 @@ const TABS = ["Overview", "Rules", "Classes", "Title sync", "Exceptions"] as con
 /** Which tab owns each fix-capable rule (for the Overview audit chips). */
 export const FIX_RULE_TAB: Record<string, string> = {
   "FM-AREA-MISSING": "Rules",
+  "NOTETYPE-CASE": "Rules",
   "TAG-FORMAT": "Rules",
   "TAG-CASE": "Rules",
   "TAG-RETIRED": "Rules",

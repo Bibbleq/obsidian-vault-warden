@@ -98,9 +98,28 @@ function checkBaseFields(path: string, frontmatter: Frontmatter, base: BaseSchem
     }
     const allowed = spec.values ?? [];
     if (allowed.length === 0) continue;
+    // A class-managed note (required_unless field present) is typed by its
+    // class, so a stray base-field value is removed, not coerced.
+    const classManaged =
+      !!spec.required_unless && !isEmpty(fmGet(frontmatter, spec.required_unless));
     const items = spec.type === "multi" ? asList(value) : [value];
     for (const item of items) {
-      if (!allowed.includes(String(item))) {
+      if (allowed.includes(String(item))) continue;
+      if (classManaged) {
+        violations.push(
+          violation({
+            rule: invalidRule,
+            field: name,
+            found: shown(item),
+            expected: `class-managed note: remove stray ${name}`,
+            mechanical: true,
+            suggested_fix: { op: "remove", field: name },
+          })
+        );
+      } else if (name === "notetype") {
+        // Governed facet: tolerate-and-flag, not a hard invalid.
+        violations.push(...checkNotetypeValue(String(item), allowed, base.notetype_retired ?? []));
+      } else {
         violations.push(
           violation({
             rule: invalidRule,
@@ -113,6 +132,45 @@ function checkBaseFields(path: string, frontmatter: Frontmatter, base: BaseSchem
     }
   }
   return violations;
+}
+
+/**
+ * Notetype governance for a value not exactly in the canonical list (mirrors
+ * `_check_notetype_value`). Order: casing fix → retired → tolerate-and-flag.
+ * Only reached for non-class notes (class-managed strays are removed above).
+ */
+function checkNotetypeValue(value: string, allowed: string[], retired: string[]): Violation[] {
+  const canon = allowed.find((a) => a.toLowerCase() === value.toLowerCase());
+  if (canon !== undefined) {
+    return [
+      violation({
+        rule: "NOTETYPE-CASE",
+        field: "notetype",
+        found: value,
+        expected: canon,
+        mechanical: true,
+        suggested_fix: { op: "set_field", field: "notetype", value: canon },
+      }),
+    ];
+  }
+  if (retired.includes(value)) {
+    return [
+      violation({
+        rule: "NOTETYPE-RETIRED",
+        field: "notetype",
+        found: value,
+        expected: "retired notetype - migrate to a current type (see Note Types Directory)",
+      }),
+    ];
+  }
+  return [
+    violation({
+      rule: "NOTETYPE-UNLISTED",
+      field: "notetype",
+      found: value,
+      expected: "not in Note Types.md - promote it or canonicalise into an existing type",
+    }),
+  ];
 }
 
 /**

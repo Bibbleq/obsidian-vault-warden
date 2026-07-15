@@ -4,6 +4,15 @@ All notable changes to Vault Warden. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions are the plugin's
 release tags (bare, no `v` prefix, per Obsidian convention).
 
+## 0.13.0
+
+- Notetype governance (shared contract with the batch validator): a non-class
+  `notetype` not in the canonical set is no longer a hard `FM-NOTETYPE-INVALID`.
+  Instead `NOTETYPE-CASE` (mechanical, fix to canonical casing), `NOTETYPE-RETIRED`
+  (from `Note Types Retired.md`), or `NOTETYPE-UNLISTED` (tolerate-and-flag).
+  `FM-NOTETYPE-INVALID` now fires only to remove a stray notetype from a
+  class-managed note. New `remove` fix op. Conformance fixtures updated in lockstep.
+
 ## 0.12.0
 
 - Retired tags read from `Tags Retired.md` (a line-list in Metadata Sources)

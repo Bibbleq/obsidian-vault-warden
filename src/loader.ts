@@ -189,6 +189,8 @@ export class SchemaLoader {
     // Retired tags: the `Tags Retired.md` line-list is authoritative when it
     // exists; otherwise fall back to the legacy inline `tags.retired` block.
     const retiredFromFile = await this.retiredSourceValues("Tags Retired");
+    // Retired notetypes: convention-named line-list (no inline fallback).
+    const notetypeRetired = (await this.retiredSourceValues("Note Types Retired")) ?? [];
     return {
       version: Number(data["base_schema_version"] ?? 1),
       fields,
@@ -200,6 +202,7 @@ export class SchemaLoader {
         ? stringList(dates["name_suffixes"])
         : ["_date", "_deadline"],
       presence_only: stringList(presenceOnly),
+      notetype_retired: notetypeRetired,
     };
   }
 

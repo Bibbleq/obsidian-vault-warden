@@ -165,7 +165,10 @@ violations **suppressed-but-reported**; without it the note is fully skipped.
 | `FM-AREA-MISSING` † | base field `area` empty (mechanical when the folder path derives a valid area — longest segment-prefix match) |
 | `FM-AREA-INVALID` | `area` present but not in its value set |
 | `FM-NOTETYPE-MISSING` | `notetype` empty and `required_unless` field also empty |
-| `FM-NOTETYPE-INVALID` | any `notetype` entry not in its value set |
+| `FM-NOTETYPE-INVALID` † | fires only for a **class-managed** note carrying a stray `notetype` — mechanical: remove it. A non-class note's unlisted notetype is governed (below), not a hard error |
+| `NOTETYPE-CASE` † | a non-class `notetype` matches a canonical value case-insensitively but in the wrong case — mechanical: set the canonical casing |
+| `NOTETYPE-RETIRED` | a non-class `notetype` is on the retired list (`Note Types Retired.md`) — report-only, migrate it |
+| `NOTETYPE-UNLISTED` | a non-class `notetype` is well-formed but not canonical and not retired — report-only, tolerate-and-flag (promote or canonicalise) |
 | `FM-ORIGIN-MISSING` / `-INVALID` | same pattern for `origin` |
 | `TAG-FORMAT` † | tag fails `^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$` (or a non-string tag entry) |
 | `TAG-CASE` † | tag is well-formed but a segment starts lowercase |
@@ -215,6 +218,12 @@ human judgement.
 - **Suppression**: rule IDs listed in the note's `validator_ignore` frontmatter
   (string or list, matched case-insensitively) or in a matching rule-scoped
   exception mark those violations `suppressed: true` — reported, not dropped.
+- **Retired lists**: retired tags and notetypes live in convention-named
+  line-list notes in the sources folder — `Tags Retired.md` and
+  `Note Types Retired.md` — read like any `select:`/`multi:` source. Canonical
+  notetypes come from the `notetype` field's own `values` (`multi:Note Types`);
+  a non-class notetype not in that set is governed (`NOTETYPE-CASE` /
+  `-RETIRED` / `-UNLISTED`), not hard-rejected.
 - Suggested tag-casing fixes Pascal-case each segment (splitting on `-`/`_`/space);
   an engine with vault-wide casing knowledge may substitute established casings
   (e.g. `LLM` over `Llm`), so fixtures don't assert casing suggestions beyond the
