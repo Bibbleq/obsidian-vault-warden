@@ -1,5 +1,5 @@
 import { App, Modal, Notice, Setting, debounce } from "obsidian";
-import type { FieldSpec } from "./engine/types";
+import type { DisplayField, DisplaySection, FieldSpec } from "./engine/types";
 import type VaultWardenPlugin from "./main";
 import { TextPromptModal } from "./modals";
 import { appendToSeq, deletePath, removeFromSeq, renameKey, setPath } from "./schemawrite";
@@ -752,6 +752,8 @@ export class ClassEditorModal extends Modal {
       })
     );
 
+    this.renderDisplayEditor(contentEl, edit, rerender);
+
     new Setting(contentEl).setName("Lifecycle (STATUS-STALE)").setHeading();
     (manifest.lifecycle ?? []).forEach((rule, i) => {
       const row = new Setting(contentEl).setName(`${rule.date_field || "?"} → ${rule.suggest || "?"}`);
@@ -786,6 +788,137 @@ export class ClassEditorModal extends Modal {
         );
         rerender();
       })
+    );
+  }
+
+  /**
+   * Editor for the plugin-only `display:` block. Since it is GUI-managed (no
+   * meaningful hand-comments inside it), edits mutate an in-memory copy and
+   * write the whole array back with setPath — which touches only the `display`
+   * node, leaving every other comment in the manifest intact. Reordering is an
+   * array swap; no reorder primitive needed in the write layer.
+   */
+  private renderDisplayEditor(
+    contentEl: HTMLElement,
+    edit: (t: (s: string) => string) => Promise<void>,
+    rerender: () => void
+  ): void {
+    const PALETTE = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"];
+    const manifest = this.plugin.loader.manifests[this.className];
+    // Deep working copy so text edits accumulate before each whole-array write.
+    const display: DisplaySection[] = JSON.parse(JSON.stringify(manifest?.display ?? []));
+
+    const clean = (sections: DisplaySection[]): unknown =>
+      sections.map((s) => {
+        const out: Record<string, unknown> = { section: s.section };
+        if (s.icon) out.icon = s.icon;
+        if (s.color) out.color = s.color;
+        out.fields = (s.fields ?? []).map((f) => {
+          const fo: Record<string, unknown> = { field: f.field };
+          if (f.label) fo.label = f.label;
+          if (f.icon) fo.icon = f.icon;
+          return fo;
+        });
+        return out;
+      });
+    const write = () => edit((s) => setPath(s, ["display"], clean(display)));
+    const writeAnd = async (fn: () => void) => {
+      fn();
+      await write();
+      rerender();
+    };
+
+    new Setting(contentEl).setName("Display layout (pane)").setHeading();
+    if (display.length === 0) {
+      new Setting(contentEl)
+        .setDesc("No layout — the pane shows a flat field list. Add one for sections, icons, and labels.")
+        .addButton((btn) =>
+          btn.setButtonText("Add display layout").onClick(() =>
+            void writeAnd(() => display.push({ section: "Details", fields: [] }))
+          )
+        );
+      return;
+    }
+
+    display.forEach((section, si) => {
+      const head = new Setting(contentEl).setClass("vault-warden-display-section");
+      debouncedText(head.setName("Section"), section.section, "heading", (v) => {
+        section.section = v;
+        void write();
+      });
+      debouncedText(head, section.icon ?? "", "lucide icon", (v) => {
+        section.icon = v.trim() || null;
+        void write();
+      });
+      head.addDropdown((dd) => {
+        dd.addOption("", "no colour");
+        for (const c of PALETTE) dd.addOption(c, c);
+        dd.setValue(section.color ?? "").onChange((v) => {
+          section.color = v || null;
+          void write();
+        });
+      });
+      head.addExtraButton((b) =>
+        b.setIcon("chevron-up").setTooltip("Move up").setDisabled(si === 0).onClick(() =>
+          void writeAnd(() => display.splice(si - 1, 0, display.splice(si, 1)[0]))
+        )
+      );
+      head.addExtraButton((b) =>
+        b
+          .setIcon("chevron-down")
+          .setTooltip("Move down")
+          .setDisabled(si === display.length - 1)
+          .onClick(() => void writeAnd(() => display.splice(si + 1, 0, display.splice(si, 1)[0])))
+      );
+      head.addExtraButton((b) =>
+        b.setIcon("trash").setTooltip("Delete section").onClick(() =>
+          void writeAnd(() => display.splice(si, 1))
+        )
+      );
+
+      section.fields ??= [];
+      section.fields.forEach((f, fi) => {
+        const row = new Setting(contentEl).setClass("vault-warden-display-field");
+        debouncedText(row.setName("Field"), f.field, "frontmatter key", (v) => {
+          f.field = v.trim();
+          void write();
+        });
+        debouncedText(row, f.label ?? "", "label", (v) => {
+          f.label = v.trim() || null;
+          void write();
+        });
+        debouncedText(row, f.icon ?? "", "icon", (v) => {
+          f.icon = v.trim() || null;
+          void write();
+        });
+        row.addExtraButton((b) =>
+          b.setIcon("chevron-up").setDisabled(fi === 0).onClick(() =>
+            void writeAnd(() => section.fields.splice(fi - 1, 0, section.fields.splice(fi, 1)[0]))
+          )
+        );
+        row.addExtraButton((b) =>
+          b
+            .setIcon("chevron-down")
+            .setDisabled(fi === section.fields.length - 1)
+            .onClick(() =>
+              void writeAnd(() => section.fields.splice(fi + 1, 0, section.fields.splice(fi, 1)[0]))
+            )
+        );
+        row.addExtraButton((b) =>
+          b.setIcon("trash").onClick(() => void writeAnd(() => section.fields.splice(fi, 1)))
+        );
+      });
+      new Setting(contentEl).addButton((btn) =>
+        btn.setButtonText("Add field").onClick(() =>
+          void writeAnd(() => section.fields.push({ field: "" }))
+        )
+      );
+    });
+
+    new Setting(contentEl).addButton((btn) =>
+      btn.setButtonText("Add section").onClick(() =>
+        void writeAnd(() => display.push({ section: "Section", fields: [] }))
+      )
     );
   }
 }

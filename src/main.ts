@@ -86,13 +86,13 @@ export default class VaultWardenPlugin extends Plugin {
     this.statusBarEl.onClickEvent(() => void this.activateView());
     this.updateBadge(null);
 
-    this.addRibbonIcon("shield-alert", "Vault Warden: open violations", () => {
+    this.addRibbonIcon("shield-alert", "Vault Warden: note panel", () => {
       void this.activateView();
     });
 
     this.addCommand({
       id: "open-violations",
-      name: "Open violations pane",
+      name: "Open note panel",
       callback: () => void this.activateView(),
     });
     this.addCommand({

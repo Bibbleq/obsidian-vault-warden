@@ -230,6 +230,16 @@
   color: var(--text-accent);
 }
 
+.vault-warden-display-section {
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: var(--size-4-2);
+}
+
+.vault-warden-display-field {
+  padding-left: var(--size-4-4);
+  border-top: none;
+}
+
 .vault-warden-chip {
   background: var(--background-secondary);
   border-radius: var(--radius-s);

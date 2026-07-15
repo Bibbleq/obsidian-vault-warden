@@ -4,6 +4,15 @@ All notable changes to Vault Warden. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions are the plugin's
 release tags (bare, no `v` prefix, per Obsidian convention).
 
+## 0.11.0
+
+- Display layout editor in the class modal: add/remove/reorder sections and
+  their fields, with icon, palette colour, and label controls. Writes the
+  whole `display:` block via setPath, preserving the rest of the manifest's
+  comments. Reordering is an array swap (no new write primitive).
+- The pane's ribbon icon and command are renamed to "note panel" (the pane
+  shows properties as well as violations).
+
 ## 0.10.0
 
 - TAG-CASE / TAG-FORMAT fixes adopt the vault's established segment casing
