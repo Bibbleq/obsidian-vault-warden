@@ -13,22 +13,22 @@ import {
  * multi-line header comment, a mix of block and flow map styles, an inline
  * trailing comment on a flow map field, and a comment attached to a seq key.
  */
-const FIXTURE = `# Header comment explaining the file — v2 (2026-07-10, rule review)
+const FIXTURE = `# Header comment explaining the file â€” v2 (2026-07-10, rule review)
 #   - detailed rationale line
 manifest_version: 2
-class: MCCUGEvent
+class: MeetupEvent
 fields:
   event_date: {type: date, required: true}
   status:
     type: select
     required: true
     values: [Planning, Confirmed]
-  series: {type: wikilink, required: true}        # File link -> UserGroup note
+  series: {type: wikilink, required: true}        # File link -> hub note
 locations:
-  - prefix: IT Pro/User Groups/MCCUG
-    class: MCCUGEvent
-  - prefix: Hobbies/Parts Storage
-    class: StoragePart
+  - prefix: Clubs/Meetups
+    class: MeetupEvent
+  - prefix: Hobbies/Gadgets
+    class: GadgetPart
 tags:
   max_depth: 2
   # retired tags from the taxonomy note
@@ -36,9 +36,9 @@ tags:
     - OldTag
 `;
 
-const HEADER_LINE_1 = "# Header comment explaining the file — v2 (2026-07-10, rule review)";
+const HEADER_LINE_1 = "# Header comment explaining the file â€” v2 (2026-07-10, rule review)";
 const HEADER_LINE_2 = "#   - detailed rationale line";
-const INLINE_COMMENT = "# File link -> UserGroup note";
+const INLINE_COMMENT = "# File link -> hub note";
 const RETIRED_COMMENT = "# retired tags from the taxonomy note";
 
 /** Asserts all three well-known fixture comments are still present verbatim. */
@@ -163,12 +163,12 @@ describe("removeFromSeq", () => {
 
   it("removes a matching map entry by deep equality", () => {
     const out = removeFromSeq(FIXTURE, ["locations"], {
-      prefix: "IT Pro/User Groups/MCCUG",
-      class: "MCCUGEvent",
+      prefix: "Clubs/Meetups",
+      class: "MeetupEvent",
     });
 
     const parsed = assertRoundTripsCleanly(out) as any;
-    expect(parsed.locations).toEqual([{ prefix: "Hobbies/Parts Storage", class: "StoragePart" }]);
+    expect(parsed.locations).toEqual([{ prefix: "Hobbies/Gadgets", class: "GadgetPart" }]);
     expectFixtureCommentsPreserved(out);
   });
 
@@ -262,8 +262,8 @@ describe("round-trip safety", () => {
       appendToSeq(FIXTURE, ["title_sync", "ignore"], "^_"),
       removeFromSeq(FIXTURE, ["tags", "retired"], "OldTag"),
       removeFromSeq(FIXTURE, ["locations"], {
-        prefix: "IT Pro/User Groups/MCCUG",
-        class: "MCCUGEvent",
+        prefix: "Clubs/Meetups",
+        class: "MeetupEvent",
       }),
       renameKey(FIXTURE, ["fields"], "series", "series_link"),
     ];
