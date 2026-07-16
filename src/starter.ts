@@ -39,6 +39,9 @@ dates:
 
 # Extra frontmatter stamped alongside class: when the creation hook fires for
 # a note created inside a class_locations-mapped folder.
+# CAUTION: stamped values must satisfy the field's own rules — if you enable
+# the origin field above (select:Origin), "manual" must exist in Origin.md
+# or every stamped note is born invalid.
 creation_stamp:
   origin: manual
 `;

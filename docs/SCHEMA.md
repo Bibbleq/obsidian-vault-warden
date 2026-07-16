@@ -56,7 +56,9 @@ dates:
                                       # accepted as a legacy key name)
 
 # Plugin-only key (batch validators ignore unknown keys): extra frontmatter
-# stamped alongside class: by the creation hook.
+# stamped alongside class: by the creation hook. Stamped values must satisfy
+# the field's own rules — e.g. if origin is select:Origin, "manual" must be a
+# line in Origin.md or every stamped note is born invalid.
 creation_stamp:
   origin: manual
 ```
