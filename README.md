@@ -29,7 +29,7 @@ than a silent behaviour change.
   - Tags — `TAG-FORMAT`, `TAG-CASE`, `TAG-DEPTH`, `TAG-RETIRED`,
     `TAG-DUPLICATE`
   - Dates — `DATE-FORMAT` (ISO, including suffix-named fields on classless
-    notes), `CREATED-MISSING`
+    notes), `CREATED-MISSING`, `CREATED-FS-DRIFT`
   - Classes — `CLASS-UNKNOWN`, `CLASS-FIELD-MISSING` (including conditional
     `required_when`), `CLASS-FIELD-TYPE`, `CLASS-FIELD-VALUE`,
     `CLASS-EXPECTED`, `CLASS-MISFILED`, `STATUS-STALE`
@@ -43,6 +43,13 @@ than a silent behaviour change.
   on detection), set per rule in settings. Fixes include tag re-casing (adopting
   your vault's established casing), de-duplication, date normalisation, class
   stamping, and `created` backfilled from the filesystem timestamp.
+- **Filesystem created dates** — the same relationship run backwards: with
+  `CREATED-FS-DRIFT` enabled, a note whose on-disk creation stamp disagrees with
+  its `created` property is flagged and can be restamped, so the vault sorts by
+  authored date in Obsidian's file list and in the OS file manager. Commands
+  restamp the current note or a whole folder on demand (also on the folder
+  right-click menu). Windows desktop only — there is no portable API for a
+  file's creation stamp, so the rule reports itself inactive elsewhere.
 - **Filename ↔ H1 sync** — the filename is the lossy projection of the H1
   (`sanitise(H1) == filename`). Substantive drift renames the file to follow the
   H1 (backlinks update, old name optionally kept as an alias); cosmetic or

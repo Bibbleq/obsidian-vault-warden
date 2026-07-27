@@ -1,5 +1,6 @@
 import { App, Modal, Notice, Setting, debounce } from "obsidian";
 import type { DisplayField, DisplaySection, FieldSpec } from "./engine/types";
+import { creationStampSupport } from "./fsstamp";
 import type VaultWardenPlugin from "./main";
 import { TextPromptModal } from "./modals";
 import { appendToSeq, deletePath, removeFromSeq, renameKey, setPath } from "./schemawrite";
@@ -169,6 +170,37 @@ export function renderRulesTab(
     "CREATED-MISSING",
     "Stamp created from the file's creation timestamp"
   );
+
+  const stampSupport = creationStampSupport();
+  new Setting(dates)
+    .setName("Check the filesystem created date")
+    .setDesc(
+      stampSupport.supported
+        ? "Report CREATED-FS-DRIFT when a note's on-disk creation date disagrees with its " +
+          "created property, so the vault sorts by authored date outside Obsidian too. " +
+          "Off by default — an established vault will drift on many notes at once. The " +
+          "\"Sync filesystem created date\" commands work whether this is on or off."
+        : `Unavailable here — ${stampSupport.reason}.`
+    )
+    .addToggle((toggle) =>
+      toggle
+        .setValue(plugin.settings.fsCreatedStamp && stampSupport.supported)
+        .setDisabled(!stampSupport.supported)
+        .onChange(async (value) => {
+          plugin.settings.fsCreatedStamp = value;
+          await plugin.saveSettings();
+          await plugin.validateActiveFile();
+          refresh();
+        })
+    );
+  if (stampSupport.supported && plugin.settings.fsCreatedStamp) {
+    fixModeDropdown(
+      dates,
+      plugin,
+      "CREATED-FS-DRIFT",
+      "Set the file's on-disk creation date to match created"
+    );
+  }
 
   const fields = sectionCard(container, "Base fields");
   fields.createEl("p", {
@@ -588,6 +620,18 @@ export function renderActiveRules(el: HTMLElement, plugin: VaultWardenPlugin): v
       (base.presence_only.length > 0 ? `; exempt: ${base.presence_only.join(", ")}` : "")
   );
   rule("CREATED-MISSING", true, "created must be present on every note");
+  {
+    const support = creationStampSupport();
+    rule(
+      "CREATED-FS-DRIFT",
+      support.supported && plugin.settings.fsCreatedStamp,
+      !support.supported
+        ? support.reason
+        : plugin.settings.fsCreatedStamp
+          ? "the file's on-disk creation date must match created"
+          : "disabled — enable it in the Rules tab"
+    );
+  }
 
   const classCount = Object.keys(loader.manifests).length;
   category("Classes");

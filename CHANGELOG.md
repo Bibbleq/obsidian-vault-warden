@@ -4,6 +4,20 @@ All notable changes to Vault Warden. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions are the plugin's
 release tags (bare, no `v` prefix, per Obsidian convention).
 
+## 0.14.0
+
+- Filesystem created dates can now be driven from frontmatter — the inverse of
+  the `CREATED-MISSING` fix. New plugin-only rule `CREATED-FS-DRIFT` (off by
+  default, Rules → Dates) flags notes whose on-disk creation stamp disagrees
+  with `created`, with a fix button and a per-rule Manual/Automatic mode. Two
+  commands restamp on demand — the current note, or a whole folder (also on the
+  folder right-click menu), batched into a single PowerShell call.
+- Windows desktop only: there is no portable API for a file's creation stamp
+  (`fs.utimes` covers modified/accessed only), so the rule and commands report
+  themselves unavailable on macOS, Linux, and mobile rather than half-working.
+- New `set_file_ctime` fix op; the pane's "Set…" override on a drift violation
+  retargets the file stamp rather than editing `created`.
+
 ## 0.13.0
 
 - Notetype governance (shared contract with the batch validator): a non-class

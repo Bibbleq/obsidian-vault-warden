@@ -118,8 +118,9 @@ export function applyFixToFrontmatter(
 
     case "wrap_in_code":
     default:
-      // Body-content ops (and anything unrecognised) are out of scope for
-      // frontmatter fix application.
+      // Body-content and filesystem-metadata ops (and anything unrecognised)
+      // are out of scope for frontmatter fix application — the adapter routes
+      // those before this module ever sees them.
       return false;
   }
 }
