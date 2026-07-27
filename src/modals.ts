@@ -1,4 +1,32 @@
-import { App, Modal, Setting, SuggestModal, TFile } from "obsidian";
+import { App, Modal, Setting, SuggestModal, TFile, TFolder } from "obsidian";
+
+/** Pick a folder from the vault (creation-stamp sweeps target a folder). */
+export class FolderSuggestModal extends SuggestModal<TFolder> {
+  private onPick: (folder: TFolder) => void;
+
+  constructor(app: App, placeholder: string, onPick: (folder: TFolder) => void) {
+    super(app);
+    this.onPick = onPick;
+    this.setPlaceholder(placeholder);
+  }
+
+  getSuggestions(query: string): TFolder[] {
+    const q = query.toLowerCase();
+    const folders: TFolder[] = [];
+    for (const file of this.app.vault.getAllLoadedFiles()) {
+      if (file instanceof TFolder && file.path.toLowerCase().includes(q)) folders.push(file);
+    }
+    return folders.sort((a, b) => a.path.localeCompare(b.path)).slice(0, 50);
+  }
+
+  renderSuggestion(folder: TFolder, el: HTMLElement): void {
+    el.setText(folder.path === "/" ? "(vault root)" : folder.path);
+  }
+
+  onChooseSuggestion(folder: TFolder): void {
+    this.onPick(folder);
+  }
+}
 
 /** Pick a note from the vault; resolves to "[[basename]]" link text. */
 export class FileLinkSuggestModal extends SuggestModal<TFile> {

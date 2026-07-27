@@ -56,10 +56,11 @@ export type TitleRuleId = (typeof TITLE_RULE_IDS)[number];
 
 /**
  * Plugin-only rules detected by the Obsidian adapter (not the pure engine):
- * FM-PARSE from raw file text, LINK-BROKEN from the metadata cache. Batch-only
- * in the Python contract, so absent from the conformance fixtures.
+ * FM-PARSE from raw file text, LINK-BROKEN from the metadata cache,
+ * CREATED-FS-DRIFT from the file's on-disk creation stamp. Batch-only in the
+ * Python contract, so absent from the conformance fixtures.
  */
-export const PLUGIN_RULE_IDS = ["FM-PARSE", "LINK-BROKEN"] as const;
+export const PLUGIN_RULE_IDS = ["FM-PARSE", "LINK-BROKEN", "CREATED-FS-DRIFT"] as const;
 
 export type PluginRuleId = (typeof PLUGIN_RULE_IDS)[number];
 
@@ -236,8 +237,9 @@ export interface ValidationInput {
 
 /**
  * A concrete fix operation. The first five match the Python engine's
- * suggested_fix dicts; set_h1 and rename_file are plugin-only title-sync ops
- * (they touch the note body / the file itself, not frontmatter).
+ * suggested_fix dicts; set_h1, rename_file and set_file_ctime are plugin-only
+ * (they touch the note body, the file itself, or its filesystem metadata
+ * rather than frontmatter). `set_file_ctime` carries epoch millis in `value`.
  */
 export interface SuggestedFix {
   op:
@@ -248,7 +250,8 @@ export interface SuggestedFix {
     | "set_list"
     | "wrap_in_code"
     | "set_h1"
-    | "rename_file";
+    | "rename_file"
+    | "set_file_ctime";
   field: string;
   found?: string;
   value?: unknown;

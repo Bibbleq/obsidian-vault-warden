@@ -359,9 +359,11 @@ export class WardenView extends ItemView {
             ? `Rename → ${String(value ?? "")}`
             : op === "set_h1"
               ? "Fix H1"
-              : op === "set_field" && value != null
-                ? `Fix → ${String(value)}`
-                : "Fix";
+              : op === "set_file_ctime"
+                ? `Restamp → ${violation.expected ?? ""}`
+                : op === "set_field" && value != null
+                  ? `Fix → ${String(value)}`
+                  : "Fix";
       const fixBtn = actions.createEl("button", { text: label, cls: "mod-cta" });
       fixBtn.addEventListener("click", () => void this.plugin.applyFixes([violation]));
     }

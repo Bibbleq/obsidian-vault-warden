@@ -31,6 +31,13 @@ export interface VaultWardenSettings {
   settingsTab: string;
   /** Pane group key -> collapsed (true) / expanded (false). Absent = default. */
   collapsedSections: Record<string, boolean>;
+  /**
+   * Report CREATED-FS-DRIFT (the on-disk creation stamp disagreeing with
+   * frontmatter `created`). Off by default: a vault that grew up without it
+   * drifts nearly everywhere, so opting in is the user's call. The explicit
+   * restamp commands work either way.
+   */
+  fsCreatedStamp: boolean;
 }
 
 export const DEFAULT_SETTINGS: VaultWardenSettings = {
@@ -38,6 +45,7 @@ export const DEFAULT_SETTINGS: VaultWardenSettings = {
   autoFix: {},
   settingsTab: "Overview",
   collapsedSections: {},
+  fsCreatedStamp: false,
 };
 
 const TABS = ["Overview", "Rules", "Classes", "Title sync", "Exceptions"] as const;
@@ -52,6 +60,7 @@ export const FIX_RULE_TAB: Record<string, string> = {
   "TAG-DUPLICATE": "Rules",
   "DATE-FORMAT": "Rules",
   "CREATED-MISSING": "Rules",
+  "CREATED-FS-DRIFT": "Rules",
   "CLASS-EXPECTED": "Classes",
   "STATUS-STALE": "Classes",
   "H1-MISSING": "Title sync",

@@ -195,12 +195,32 @@ index), so a fix can suggest `LLM` over `Llm` where that casing already
 dominates. This is a plugin-side enrichment; the batch validator does the
 equivalent from its own note index.
 
-Two further rules are detected by the plugin adapter (not the pure engine, and
-so absent from the conformance fixtures), report-only:
+Three further rules are detected by the plugin adapter (not the pure engine, and
+so absent from the conformance fixtures):
 
-- `FM-PARSE` — the note opens with a frontmatter block the YAML parser rejected;
-  short-circuits all other rules for that note.
-- `LINK-BROKEN` — one or more `[[wikilinks]]` in the note resolve to no file.
+- `FM-PARSE` — report-only. The note opens with a frontmatter block the YAML
+  parser rejected; short-circuits all other rules for that note.
+- `LINK-BROKEN` — report-only. One or more `[[wikilinks]]` in the note resolve
+  to no file.
+- `CREATED-FS-DRIFT` † — the file's on-disk creation stamp disagrees with
+  frontmatter `created`. The inverse of `CREATED-MISSING`: that rule reads the
+  filesystem to fill in `created`, this one treats `created` as the author's
+  intent and pushes it back onto the file, so the vault sorts by authored date
+  in Obsidian's file list and in the OS file manager. **Off by default** (an
+  established vault drifts on many notes at once) — enable it under Rules →
+  Dates. **Windows desktop only**: Node's `fs.utimes` sets modified/accessed
+  times only, and there is no portable creation-stamp API, so the fix shells
+  out to PowerShell; Linux cannot set birthtime and macOS needs Xcode's
+  `SetFile`, so the rule stays inactive there.
+
+  A bare `YYYY-MM-DD` `created` is compared by day only, and a correction keeps
+  the file's existing time-of-day, so notes authored on the same day hold their
+  relative order instead of collapsing to midnight. A `created` with a time is
+  matched to the minute — the precision the plugin writes it at.
+
+  The `Sync filesystem created date…` commands (current note, or a folder — also
+  on the folder right-click menu) do the same job on demand and work whether the
+  rule is enabled or not.
 
 Other batch-only rules (`FILENAME-COLLISION`, `INBOX-STALE`,
 `AREA-FOLDER-MISMATCH`, `BODY-TAG`, `TAG-SPARSE`, `TAG-TWIN`, …) remain

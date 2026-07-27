@@ -1,14 +1,32 @@
-import { Notice, Plugin, TAbstractFile, TFile, debounce } from "obsidian";
+import {
+  FileSystemAdapter,
+  Notice,
+  Plugin,
+  TAbstractFile,
+  TFile,
+  TFolder,
+  debounce,
+} from "obsidian";
 import { applySuppressions, validate } from "./engine/validate";
 import { applyAllFixes, applyFixToFrontmatter } from "./engine/fixops";
 import { analyzeTitle } from "./engine/titlesync";
 import type { FieldSpec, ValidationInput, Violation } from "./engine/types";
 import { isBodyEmpty, renderScaffold, setFirstH1, splitFrontmatter } from "./body";
+import {
+  creationStampSupport,
+  parseStamp,
+  planCreationStamp,
+  readCreationTimeMs,
+  setCreationTimes,
+  type StampPlan,
+  type StampTarget,
+} from "./fsstamp";
 import { SchemaLoader } from "./loader";
 import { appendToSeq } from "./schemawrite";
 import {
   DatePromptModal,
   FileLinkSuggestModal,
+  FolderSuggestModal,
   TextPromptModal,
   ValueSuggestModal,
 } from "./modals";
@@ -62,6 +80,19 @@ function resolveTokens(value: unknown): unknown {
   return value;
 }
 
+/** Every markdown file under `folder`, recursively. */
+function markdownFilesIn(folder: TFolder): TFile[] {
+  const files: TFile[] = [];
+  const walk = (current: TFolder) => {
+    for (const child of current.children) {
+      if (child instanceof TFolder) walk(child);
+      else if (child instanceof TFile && child.extension === "md") files.push(child);
+    }
+  };
+  walk(folder);
+  return files;
+}
+
 export default class VaultWardenPlugin extends Plugin {
   settings: VaultWardenSettings = DEFAULT_SETTINGS;
   loader!: SchemaLoader;
@@ -112,6 +143,25 @@ export default class VaultWardenPlugin extends Plugin {
       },
     });
     this.addCommand({
+      id: "sync-created-stamp-note",
+      name: "Sync filesystem created date from frontmatter (current note)",
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file || file.extension !== "md") return false;
+        if (!checking) void this.syncCreationStamps([file], `"${file.basename}"`);
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "sync-created-stamp-folder",
+      name: "Sync filesystem created dates from frontmatter (folder)…",
+      callback: () => {
+        new FolderSuggestModal(this.app, "Restamp notes in folder…", (folder) => {
+          void this.syncCreationStamps(markdownFilesIn(folder), `"${folder.name || "vault"}"`);
+        }).open();
+      },
+    });
+    this.addCommand({
       id: "validate-current-note",
       name: "Validate current note",
       callback: async () => {
@@ -140,6 +190,22 @@ export default class VaultWardenPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => debouncedValidate())
+    );
+
+    // Right-click a folder -> restamp everything under it. Hidden where the
+    // platform can't set creation stamps at all.
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (!(file instanceof TFolder) || !creationStampSupport().supported) return;
+        menu.addItem((item) =>
+          item
+            .setTitle("Sync created dates from frontmatter")
+            .setIcon("calendar-clock")
+            .onClick(() => {
+              void this.syncCreationStamps(markdownFilesIn(file), `"${file.name || "vault"}"`);
+            })
+        );
+      })
     );
 
     const onVaultChange = (file: TAbstractFile, oldPath?: string) => {
@@ -302,7 +368,62 @@ export default class VaultWardenPlugin extends Plugin {
         };
       }
     }
+
+    // CREATED-FS-DRIFT: the same relationship as CREATED-MISSING, enforced in
+    // the other direction — frontmatter `created` is the author's intent, so
+    // the on-disk creation stamp should agree with it. Off by default: a vault
+    // that grew up without it will have drift almost everywhere, and that is
+    // the user's call to make rather than a wall of violations on first run.
+    if (this.settings.fsCreatedStamp && frontmatter) {
+      const drift = this.planStampFor(file, frontmatter);
+      if (drift && !drift.plan.inSync) {
+        all = all.concat(
+          applySuppressions(frontmatter, file.path, this.loader.exceptions, [
+            {
+              rule: "CREATED-FS-DRIFT",
+              field: "created",
+              found: drift.currentMs === null ? "unreadable" : formatLocalDatetime(drift.currentMs),
+              expected: formatLocalDatetime(drift.plan.targetMs),
+              mechanical: true,
+              suggested_fix: {
+                op: "set_file_ctime",
+                field: "created",
+                value: drift.plan.targetMs,
+              },
+              suppressed: false,
+            },
+          ])
+        );
+      }
+    }
     return all;
+  }
+
+  /** Absolute filesystem path of a vault file; null on mobile or a non-FS vault. */
+  private absPathOf(file: TFile): string | null {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) return null;
+    // Forward slashes are accepted by both Node and PowerShell on Windows, so
+    // there's no need to pull in `path` just to join.
+    return `${adapter.getBasePath()}/${file.path}`;
+  }
+
+  /**
+   * Work out the creation stamp `file` should carry, given its frontmatter.
+   * Returns null when the platform can't set creation stamps, the file has no
+   * usable `created`, or the vault isn't on a real filesystem.
+   */
+  private planStampFor(
+    file: TFile,
+    frontmatter: Record<string, unknown>
+  ): { absPath: string; currentMs: number | null; plan: StampPlan } | null {
+    if (!creationStampSupport().supported) return null;
+    const absPath = this.absPathOf(file);
+    if (!absPath) return null;
+    const currentMs = readCreationTimeMs(absPath);
+    const plan = planCreationStamp(frontmatter["created"], currentMs);
+    if (!plan) return null;
+    return { absPath, currentMs, plan };
   }
 
   private autoFixable(violations: Violation[]): Violation[] {
@@ -378,8 +499,8 @@ export default class VaultWardenPlugin extends Plugin {
 
   /**
    * Apply the mechanical suggested_fix of the given violations: frontmatter
-   * fixes in ONE processFrontMatter pass, then H1 body repairs, then a rename
-   * last (it changes the path).
+   * fixes in ONE processFrontMatter pass, then H1 body repairs, then the
+   * creation stamp, then a rename last (it changes the path).
    */
   async applyFixes(violations: Violation[]): Promise<void> {
     if (this.validatedFile) await this.applyFixesFor(this.validatedFile, violations);
@@ -388,10 +509,12 @@ export default class VaultWardenPlugin extends Plugin {
   private async applyFixesFor(file: TFile, violations: Violation[]): Promise<void> {
     const eligible = violations.filter((v) => v.mechanical && !v.suppressed && v.suggested_fix);
 
+    const NON_FRONTMATTER_OPS = ["set_h1", "rename_file", "set_file_ctime"];
     const frontmatterFixes = eligible.filter(
-      (v) => v.suggested_fix!.op !== "set_h1" && v.suggested_fix!.op !== "rename_file"
+      (v) => !NON_FRONTMATTER_OPS.includes(v.suggested_fix!.op)
     );
     const h1Fixes = eligible.filter((v) => v.suggested_fix!.op === "set_h1");
+    const ctimeFix = eligible.find((v) => v.suggested_fix!.op === "set_file_ctime");
     const rename = eligible.find((v) => v.suggested_fix!.op === "rename_file");
 
     if (frontmatterFixes.length > 0) {
@@ -402,12 +525,98 @@ export default class VaultWardenPlugin extends Plugin {
     for (const fix of h1Fixes) {
       await this.applyH1(file, String(fix.suggested_fix!.value ?? ""));
     }
+    let stamped = false;
+    if (ctimeFix) {
+      stamped = await this.applyCreationStamp(file, Number(ctimeFix.suggested_fix!.value));
+    }
     if (rename) {
       await this.applyRename(file, String(rename.suggested_fix!.value ?? ""));
     }
-    // Frontmatter/body writes re-validate via metadataCache 'changed'; a
-    // rename doesn't, so re-validate explicitly (guarded, cheap no-op otherwise).
-    if (rename) await this.validateActiveFile();
+    // Frontmatter/body writes re-validate via metadataCache 'changed'. A rename
+    // doesn't, and neither does a creation-stamp change (it leaves the file
+    // contents untouched), so re-validate explicitly for those.
+    //
+    // Deliberately only on a SUCCESSFUL stamp: a failing one leaves the drift
+    // in place, so re-validating would re-detect it and — with the rule set to
+    // Automatic — fix, fail, re-validate, forever.
+    if (rename || stamped) await this.validateActiveFile();
+  }
+
+  /**
+   * Restamp a batch of notes from their frontmatter `created`, reporting the
+   * outcome in a Notice. Every file goes into a single PowerShell process, so
+   * a whole folder costs one spawn rather than one per note.
+   *
+   * Unlike the CREATED-FS-DRIFT rule this ignores the enable-the-rule setting
+   * and suppression: it only ever runs because the user explicitly asked for
+   * this folder or this note.
+   */
+  async syncCreationStamps(files: TFile[], label: string): Promise<void> {
+    const support = creationStampSupport();
+    if (!support.supported) {
+      new Notice(`Vault Warden: ${support.reason}.`);
+      return;
+    }
+    if (files.length === 0) {
+      new Notice(`Vault Warden: no notes in ${label}.`);
+      return;
+    }
+
+    const targets: StampTarget[] = [];
+    let alreadySynced = 0;
+    let skipped = 0;
+    for (const file of files) {
+      const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (!frontmatter) {
+        skipped += 1;
+        continue;
+      }
+      const planned = this.planStampFor(file, frontmatter);
+      if (!planned) {
+        skipped += 1;
+      } else if (planned.plan.inSync) {
+        alreadySynced += 1;
+      } else {
+        targets.push({ path: planned.absPath, ms: planned.plan.targetMs });
+      }
+    }
+
+    if (targets.length === 0) {
+      new Notice(
+        `Vault Warden: nothing to restamp in ${label} ` +
+          `(${alreadySynced} already in sync, ${skipped} without a usable created date).`
+      );
+      return;
+    }
+
+    const result = await setCreationTimes(targets);
+    const parts = [`${result.ok} restamped`];
+    if (alreadySynced > 0) parts.push(`${alreadySynced} already in sync`);
+    if (skipped > 0) parts.push(`${skipped} skipped`);
+    if (result.failed.length > 0) parts.push(`${result.failed.length} failed`);
+    new Notice(
+      `Vault Warden — ${label}: ${parts.join(", ")}.` +
+        (result.error ? ` (${result.error})` : "")
+    );
+    if (result.failed.length > 0) {
+      console.error("Vault Warden: creation-stamp failures", result.failed, result.error);
+    }
+    await this.validateActiveFile();
+  }
+
+  /** Push one file's on-disk creation stamp to `targetMs`; true when it landed. */
+  private async applyCreationStamp(file: TFile, targetMs: number): Promise<boolean> {
+    const absPath = this.absPathOf(file);
+    if (!absPath || !Number.isFinite(targetMs)) return false;
+    const result = await setCreationTimes([{ path: absPath, ms: targetMs }]);
+    if (result.ok === 0) {
+      new Notice(
+        `Vault Warden: could not set the creation date of "${file.basename}"` +
+          (result.error ? ` — ${result.error}` : ".")
+      );
+      return false;
+    }
+    return true;
   }
 
   /** Repair or insert the note's first H1. */
@@ -455,8 +664,20 @@ export default class VaultWardenPlugin extends Plugin {
     const field = violationToFix.field;
     if (!file || !field) return;
 
-    // Title-sync violations edit the H1 or the filename, not frontmatter.
+    // A drift override retargets the file's creation stamp, not `created` —
+    // the pane's other date pickers all write frontmatter, so this one has to
+    // branch before them or "Set…" would silently edit the wrong side.
     const op = violationToFix.suggested_fix?.op;
+    if (op === "set_file_ctime") {
+      const initial = violationToFix.expected ?? null;
+      new DatePromptModal(this.app, "Set file created date", initial, (value) => {
+        const parsed = parseStamp(value);
+        if (parsed) void this.applyCreationStamp(file, parsed.ms);
+      }).open();
+      return;
+    }
+
+    // Title-sync violations edit the H1 or the filename, not frontmatter.
     if (op === "set_h1" || op === "rename_file") {
       const initial =
         violationToFix.expected ?? String(violationToFix.suggested_fix?.value ?? "");
