@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildStampScript,
+  buildStampPayload,
   parseStamp,
   planCreationStamp,
 } from "../src/fsstamp";
@@ -101,35 +101,32 @@ describe("planCreationStamp", () => {
   });
 });
 
-describe("buildStampScript", () => {
-  it("emits a single-line payload so the here-string cannot be broken out of", () => {
-    const script = buildStampScript([
+describe("buildStampPayload", () => {
+  it("round-trips paths and timestamps", () => {
+    const payload = buildStampPayload([
       { path: "C:/Vault/Note.md", ms: local(2026, 6, 29, 9, 0) },
     ]);
-    const payloadLine = script.split("\n")[2];
-    expect(payloadLine.startsWith("[")).toBe(true);
-    expect(JSON.parse(payloadLine)).toEqual([
+    expect(JSON.parse(payload)).toEqual([
       { p: "C:/Vault/Note.md", t: local(2026, 6, 29, 9, 0) },
     ]);
   });
 
-  it("keeps quote- and dollar-bearing filenames inert", () => {
-    const nasty = `C:/Vault/it's $PROFILE \`x\`\n'@\nGet-Item.md`;
-    const script = buildStampScript([{ path: nasty, ms: 0 }]);
-    const lines = script.split("\n");
-    const payloadLine = lines[2];
-    // The whole payload stays on one line, so no line of it can start with the
-    // here-string terminator.
-    expect(JSON.parse(payloadLine)).toEqual([{ p: nasty, t: 0 }]);
-    // Exactly one line opens with the terminator, and it's the real one.
-    const terminators = lines
-      .map((line, index) => ({ line, index }))
-      .filter(({ line }) => line.startsWith("'@"));
-    expect(terminators).toEqual([{ line: "'@ | ConvertFrom-Json", index: 3 }]);
+  it("survives filenames full of PowerShell metacharacters", () => {
+    // The payload never becomes PowerShell source — it is read back as JSON —
+    // so none of this can break out. Guard the round-trip anyway.
+    const nasty = `C:/Vault/it's $PROFILE \`x\` "q" @'\nGet-Item.md`;
+    const payload = buildStampPayload([{ path: nasty, ms: 0 }]);
+    expect(JSON.parse(payload)).toEqual([{ p: nasty, t: 0 }]);
+  });
+
+  it("escapes non-ASCII so the staged file cannot be misread as any encoding", () => {
+    const payload = buildStampPayload([{ path: "C:/Vault/Café — naïve 日本.md", ms: 0 }]);
+    // eslint-disable-next-line no-control-regex
+    expect(/^[\x20-\x7e]*$/.test(payload)).toBe(true);
+    expect(JSON.parse(payload)[0].p).toBe("C:/Vault/Café — naïve 日本.md");
   });
 
   it("rounds fractional millis (PowerShell casts the payload to [long])", () => {
-    const script = buildStampScript([{ path: "a.md", ms: 1234.6 }]);
-    expect(JSON.parse(script.split("\n")[2])[0].t).toBe(1235);
+    expect(JSON.parse(buildStampPayload([{ path: "a.md", ms: 1234.6 }]))[0].t).toBe(1235);
   });
 });

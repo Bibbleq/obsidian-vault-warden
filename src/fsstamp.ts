@@ -208,35 +208,53 @@ export function readCreationTimeMs(absPath: string): number | null {
 }
 
 /**
- * Build the PowerShell program that restamps every target.
+ * The restamp program. Constant, so no caller data is ever spliced into
+ * PowerShell source: the work list arrives out-of-band as a JSON file whose
+ * path is handed over in an environment variable.
  *
- * The payload rides in as single-line JSON inside a single-quoted here-string:
- * JSON.stringify escapes newlines, so no line of the payload can start with
- * the `'@` terminator, and single-quoting stops PowerShell interpolating `$`
- * or backticks out of a filename. Timestamps cross as epoch millis to dodge
- * date-format and timezone parsing on the far side.
+ * That indirection is load-bearing three times over. Piping the program in on
+ * stdin (`-Command -`) silently drops multi-line constructs like here-strings,
+ * so the program travels as `-EncodedCommand` instead; `-EncodedCommand` is
+ * base64 UTF-16, which nearly triples the payload against a ~32 KB command-line
+ * limit, so a folder sweep's file list cannot ride along with it; and keeping
+ * paths out of the source entirely means no filename can break out of quoting.
+ * Timestamps cross as epoch millis to dodge date-format and timezone parsing
+ * on the far side.
  */
-export function buildStampScript(targets: StampTarget[]): string {
-  const payload = JSON.stringify(targets.map((t) => ({ p: t.path, t: Math.round(t.ms) })));
-  return [
-    "$ErrorActionPreference = 'Stop'",
-    "$items = @'",
-    payload,
-    "'@ | ConvertFrom-Json",
-    "$ok = 0",
-    "$failed = @()",
-    "foreach ($i in $items) {",
-    "  try {",
-    "    $when = [datetimeoffset]::FromUnixTimeMilliseconds([long]$i.t).LocalDateTime",
-    "    (Get-Item -LiteralPath $i.p -Force).CreationTime = $when",
-    "    $ok++",
-    "  } catch {",
-    "    $failed += [string]$i.p",
-    "  }",
-    "}",
-    "[Console]::Out.Write((ConvertTo-Json -Compress -InputObject @{ ok = $ok; failed = @($failed) }))",
-  ].join("\n");
+const STAMP_SCRIPT = [
+  "$ErrorActionPreference = 'Stop'",
+  "$items = Get-Content -LiteralPath $env:VW_STAMP_FILE -Raw -Encoding UTF8 | ConvertFrom-Json",
+  "$ok = 0",
+  "$failed = @()",
+  "foreach ($i in $items) {",
+  "  try {",
+  "    $when = [datetimeoffset]::FromUnixTimeMilliseconds([long]$i.t).LocalDateTime",
+  "    (Get-Item -LiteralPath $i.p -Force).CreationTime = $when",
+  "    $ok++",
+  "  } catch {",
+  "    $failed += [string]$i.p",
+  "  }",
+  "}",
+  "[Console]::Out.Write((ConvertTo-Json -Compress -InputObject @{ ok = $ok; failed = @($failed) }))",
+].join("\n");
+
+/**
+ * The work list as JSON, with every non-ASCII character escaped so the file is
+ * pure ASCII and no encoding mismatch between Node's write and PowerShell's
+ * read can corrupt a path.
+ */
+export function buildStampPayload(targets: StampTarget[]): string {
+  const NON_ASCII = /[^\x20-\x7e]/g;
+  const json = JSON.stringify(targets.map((t) => ({ p: t.path, t: Math.round(t.ms) })));
+  // JSON.stringify already escapes control characters and the structural
+  // quotes/backslashes; this catches everything above plain ASCII.
+  return json.replace(NON_ASCII, (ch) => {
+    return `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`;
+  });
 }
+
+/** Distinguishes concurrent sweeps' payload files without a clock or RNG. */
+let payloadCounter = 0;
 
 /**
  * Restamp every target in one PowerShell process (spawning per file would cost
@@ -246,47 +264,64 @@ export function buildStampScript(targets: StampTarget[]): string {
 export async function setCreationTimes(targets: StampTarget[]): Promise<StampResult> {
   if (targets.length === 0) return { ok: 0, failed: [] };
 
+  const allFailed = (error: string): StampResult => ({
+    ok: 0,
+    failed: targets.map((t) => t.path),
+    error,
+  });
+
   const support = creationStampSupport();
-  if (!support.supported) {
-    return { ok: 0, failed: targets.map((t) => t.path), error: support.reason };
-  }
+  if (!support.supported) return allFailed(support.reason);
+
   const cp = nodeModule<typeof import("child_process")>("child_process");
-  if (!cp) {
-    return { ok: 0, failed: targets.map((t) => t.path), error: "no child_process access" };
+  const fs = nodeModule<typeof import("fs")>("fs");
+  const os = nodeModule<typeof import("os")>("os");
+  if (!cp || !fs || !os) return allFailed("no filesystem or child_process access");
+
+  payloadCounter += 1;
+  const payloadFile = `${os.tmpdir()}/vault-warden-stamp-${process.pid}-${payloadCounter}.json`;
+  try {
+    fs.writeFileSync(payloadFile, buildStampPayload(targets), "utf8");
+  } catch (e) {
+    return allFailed(`could not stage the work list: ${String(e)}`);
   }
 
-  const script = buildStampScript(targets);
-  return await new Promise<StampResult>((resolve) => {
-    const allFailed = (error: string): StampResult => ({
-      ok: 0,
-      failed: targets.map((t) => t.path),
-      error,
+  const encoded = Buffer.from(STAMP_SCRIPT, "utf16le").toString("base64");
+  try {
+    return await new Promise<StampResult>((resolve) => {
+      try {
+        cp.execFile(
+          "powershell.exe",
+          ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
+          {
+            windowsHide: true,
+            maxBuffer: 16 * 1024 * 1024,
+            env: { ...process.env, VW_STAMP_FILE: payloadFile },
+          },
+          (err, stdout) => {
+            const text = String(stdout ?? "").trim();
+            if (text === "") {
+              resolve(allFailed(err ? String(err.message ?? err) : "PowerShell returned nothing"));
+              return;
+            }
+            try {
+              const parsed = JSON.parse(text) as { ok?: number; failed?: unknown };
+              const failed = Array.isArray(parsed.failed) ? parsed.failed.map(String) : [];
+              resolve({ ok: Number(parsed.ok ?? 0), failed });
+            } catch {
+              resolve(allFailed(`unreadable PowerShell output: ${text.slice(0, 200)}`));
+            }
+          }
+        );
+      } catch (e) {
+        resolve(allFailed(String(e)));
+      }
     });
+  } finally {
     try {
-      const child = cp.execFile(
-        "powershell.exe",
-        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "-"],
-        { windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
-        (err, stdout) => {
-          const text = String(stdout ?? "").trim();
-          if (text === "") {
-            resolve(allFailed(err ? String(err.message ?? err) : "PowerShell returned nothing"));
-            return;
-          }
-          try {
-            const parsed = JSON.parse(text) as { ok?: number; failed?: unknown };
-            const failed = Array.isArray(parsed.failed) ? parsed.failed.map(String) : [];
-            resolve({ ok: Number(parsed.ok ?? 0), failed });
-          } catch {
-            resolve(allFailed(`unreadable PowerShell output: ${text.slice(0, 200)}`));
-          }
-        }
-      );
-      // The program arrives on stdin (-Command -), so nothing has to survive
-      // command-line quoting.
-      child.stdin?.end(script);
-    } catch (e) {
-      resolve(allFailed(String(e)));
+      fs.unlinkSync(payloadFile);
+    } catch {
+      // Best effort — a stray temp file is not worth surfacing to the user.
     }
-  });
+  }
 }
